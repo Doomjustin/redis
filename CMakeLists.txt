@@ -30,3 +30,4 @@ find_package(asio CONFIG REQUIRED)
 find_package(Microsoft.GSL CONFIG REQUIRED)
 
 add_subdirectory(xin)
+add_subdirectory(app)
