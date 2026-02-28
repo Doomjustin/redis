@@ -5,6 +5,7 @@ TabWidth: 4
 UseTab: Never
 # 对齐方式设置 - 统一使用左对齐，避免过度对齐导致的可读性问题
 ReferenceAlignment: Left
+PointerAlignment: Left
 
 # 不缩进case标签
 IndentCaseLabels: false
