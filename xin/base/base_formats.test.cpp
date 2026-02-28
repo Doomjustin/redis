@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace {
+
 struct HasToString {
     [[nodiscard]]
     auto to_string() const -> std::string
@@ -36,6 +38,8 @@ auto operator<<(std::ostream& os, const HasOutputOperator& value) -> std::ostrea
 struct PlainType {
     int value{ 7 };
 };
+
+} // namespace
 
 TEST_SUITE("base-xformat")
 {

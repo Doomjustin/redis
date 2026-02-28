@@ -45,7 +45,7 @@ IncludeCategories:
     CaseSensitive: false
   
   # C++ C 兼容头文件
-  - Regex: '^<c(cstdlib|cerrno|ctype|cstring|cassert|cstddef|cstdint|cinttypes|climits|clocale|cmath|complex|csignal|csetjmp|csignal|cstdalign|cstdarg|cstdbool|cstddef|cstdint|cstdio|ctgmath|ctime|cwchar|cwctype)>'
+  - Regex: '^<c(stdlib|errno|type|string|assert|stddef|stdint|inttypes|limits|locale|math|complex|signal|setjmp|signal|stdalign|stdarg|stdbool|stddef|stdint|stdio|tgmath|time|wchar|wctype)>'
     Priority: 5
     CaseSensitive: false
   
