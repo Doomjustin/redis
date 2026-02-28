@@ -11,6 +11,7 @@ target_include_directories(xin_redis PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(xin_redis 
     PUBLIC
         Microsoft.GSL::GSL
+        asio::asio
     PRIVATE
         xin::base
 )

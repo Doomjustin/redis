@@ -1,5 +1,7 @@
 #include "redis_serialization_protocl.h"
 
+#include "base_formats.h"
+
 #include <algorithm>
 #include <charconv>
 #include <expected>
@@ -150,5 +152,21 @@ auto RESPParser::reset() -> void
     current_arg_length_ = 0;
     args_.clear();
 }
+
+auto resp::simple_string(std::string_view str) -> std::string
+{
+    return base::xformat("+{}\r\n", str);
+}
+
+auto resp::error(std::string_view err) -> std::string { return base::xformat("-{}\r\n", err); }
+
+auto resp::integer(std::int64_t num) -> std::string { return base::xformat(":{}\r\n", num); }
+
+auto resp::bulk_string(std::string_view str) -> std::string
+{
+    return base::xformat("${}\r\n{}\r\n", str.size(), str);
+}
+
+auto resp::null_bulk_string() -> std::string { return "$-1\r\n"; }
 
 } // namespace xin::redis
