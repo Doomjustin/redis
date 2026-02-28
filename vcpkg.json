@@ -2,7 +2,9 @@
     "dependencies": [
         "fmt",
         "spdlog",
-        "doctest"
+        "doctest",
+        "asio",
+        "ms-gsl"
     ],
     "name": "xin",
     "version": "0.0.1",

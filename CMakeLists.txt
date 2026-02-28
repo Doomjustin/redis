@@ -26,5 +26,7 @@ include(CopyResources)
 find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(doctest CONFIG REQUIRED)
+find_package(asio CONFIG REQUIRED)
+find_package(Microsoft.GSL CONFIG REQUIRED)
 
-add_subdirectory(src)
+add_subdirectory(xin)
