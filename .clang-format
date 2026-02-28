@@ -3,6 +3,8 @@ AccessModifierOffset: -4
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
+# 对齐方式设置 - 统一使用左对齐，避免过度对齐导致的可读性问题
+ReferenceAlignment: Left
 
 # 不缩进case标签
 IndentCaseLabels: false
@@ -12,6 +14,8 @@ BreakBeforeBraces: Stroustrup
 ColumnLimit: 100
 # 模板声明换行设置
 BreakTemplateDeclarations: Yes
+# 模板关键字后不添加空格（如 template<typename T>）
+SpaceAfterTemplateKeyword: false
 
 BreakConstructorInitializers: BeforeComma
 Cpp11BracedListStyle: false
@@ -56,4 +60,4 @@ IncludeCategories:
     CaseSensitive: false
 
 # 主头文件识别模式
-IncludeIsMainRegex: '([-_](test|unittest))?$'
+IncludeIsMainRegex: '(\\.test)?$'
