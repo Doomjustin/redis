@@ -68,6 +68,16 @@ TEST_SUITE("redis-response")
         CHECK(buffers_to_string(resp.to_buffer()) == "*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
     }
 
+    TEST_CASE("BulkStringResponse 包含nil元素时按RESP编码")
+    {
+        BulkStringResponse resp;
+        resp.add_record(std::make_shared<std::string>("a"));
+        resp.add_record(nullptr);
+        resp.add_record(std::make_shared<std::string>("b"));
+
+        CHECK(buffers_to_string(resp.to_buffer()) == "*3\r\n$1\r\na\r\n$-1\r\n$1\r\nb\r\n");
+    }
+
     TEST_CASE("NullBulkStringResponse 序列化")
     {
         NullBulkStringResponse resp;

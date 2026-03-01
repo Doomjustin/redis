@@ -4,20 +4,6 @@
 
 namespace xin::redis {
 
-void Database::set(key_type key, value_type value)
-{
-    if (expire_time_.contains(key))
-        expire_time_.erase(key);
-
-    data_.insert_or_assign(std::move(key), std::move(value));
-}
-
-void Database::set(key_type key, value_type value, time_t seconds)
-{
-    expire_time_.insert_or_assign(key, now() + seconds * 1000);
-    data_.insert_or_assign(std::move(key), std::move(value));
-}
-
 auto Database::get(const key_type& key) -> std::optional<value_type>
 {
     if (erase_if_expired(key))
@@ -84,7 +70,7 @@ void Database::flush_async()
     t.detach();
 }
 
-void Database::persist(const key_type& key) { expire_time_.erase(key); }
+auto Database::persist(const key_type& key) -> bool { return expire_time_.erase(key) > 0; }
 
 auto Database::now() -> time_t
 {

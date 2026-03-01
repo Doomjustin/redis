@@ -3,14 +3,17 @@
 #include "redis_response.h"
 #include "redis_storage.h"
 
+#include <base_formats.h>
 #include <base_log.h>
 #include <base_string_utility.h>
 #include <fmt/core.h>
 
 #include <charconv>
 #include <concepts>
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <variant>
 
 namespace {
 
@@ -18,9 +21,22 @@ using namespace xin::redis;
 using namespace xin::base;
 using arguments = commands::arguments;
 using response = commands::response;
+using string_type = Database::string_type;
+using hash_type = Database::hash_type;
 using handler = std::function<response(const arguments&)>;
 
 xin::redis::Database db{};
+
+constexpr std::string_view WRONG_TYPE_ERR =
+    "WRONGTYPE Operation against a key holding the wrong kind of value";
+
+constexpr std::string_view INVALID_EXPIRY_ERR = "ERR value is not an integer or out of range";
+
+auto arguments_size_error(std::string_view command) -> std::string
+{
+    constexpr std::string_view WRONG_ARG_ERR = "ERR wrong number of arguments for '{}' command";
+    return xformat(WRONG_ARG_ERR, command);
+}
 
 template<std::integral T>
 auto numeric_cast(std::string_view str) -> std::optional<T>
@@ -39,7 +55,7 @@ auto set_with_expiry(const arguments& args) -> response
 {
     auto expiry = numeric_cast<std::uint64_t>(args[4]);
     if (!expiry)
-        return std::make_unique<ErrorResponse>("ERR value is not an integer or out of range");
+        return std::make_unique<ErrorResponse>(INVALID_EXPIRY_ERR);
 
     db.set(args[1], std::make_shared<std::string>(args[2]), *expiry);
     log::info("SET command with expiry executed with key: {}, value: {}, expire time: {} seconds",
@@ -64,14 +80,14 @@ auto set(const arguments& args) -> response
         return set_with_expiry(args);
 
     log::error("SET command received wrong number of arguments or invalid option: {}", args);
-    return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'set' command");
+    return std::make_unique<ErrorResponse>(arguments_size_error("set"));
 }
 
 auto get(const arguments& args) -> response
 {
     if (args.size() != 2) {
         log::error("GET command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'get' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("get"));
     }
 
     auto res = db.get(args[1]);
@@ -80,9 +96,15 @@ auto get(const arguments& args) -> response
         return std::make_unique<NullBulkStringResponse>();
     }
 
-    SingleBulkStringResponse response{ *res };
-    log::info("GET command executed with key: {} and value: {}", args[1], **res);
-    return std::make_unique<SingleBulkStringResponse>(std::move(response));
+    if (auto* value = std::get_if<string_type>(&*res)) {
+        log::info("GET command executed with key: {}, value found", args[1]);
+        return std::make_unique<SingleBulkStringResponse>(*value);
+    }
+
+    log::error("GET command executed with key: {}, but WRONGTYPE Operation against a key holding "
+               "the wrong kind of value",
+               args[1]);
+    return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
 auto ping(const arguments& args) -> response
@@ -98,30 +120,25 @@ auto ping(const arguments& args) -> response
     }
 
     log::error("PING command received wrong number of arguments: {}, expected 0 or 1", args);
-    return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'ping' command");
+    return std::make_unique<ErrorResponse>(arguments_size_error("ping"));
 }
 
 auto keys(const arguments& args) -> response
 {
     if (args.size() < 2) {
         log::error("KEYS command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'keys' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("keys"));
     }
 
     auto pattern = std::span{ args.begin() + 1, args.end() };
     log::info("KEYS command executed with pattern: {}", pattern);
-    auto res = db.get(pattern);
+    auto res = db.keys(pattern);
 
-    int found_count = 0;
     BulkStringResponse response{};
-    for (auto& item : res) {
-        if (item) {
-            response.add_record(item);
-            ++found_count;
-        }
-    }
+    for (auto& item : res)
+        response.add_record(std::make_shared<std::string>(item));
 
-    log::info("KEYS command executed with pattern: {}, found {} keys", pattern, found_count);
+    log::info("KEYS command executed with pattern: {}, found {} keys", pattern, res.size());
     return std::make_unique<BulkStringResponse>(std::move(response));
 }
 
@@ -129,23 +146,19 @@ auto mget(const arguments& args) -> response
 {
     if (args.size() < 2) {
         log::error("MGET command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'mget' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("mget"));
     }
 
     auto keys = std::span{ args.begin() + 1, args.end() };
     log::info("MGET command executed with keys: {}", keys);
-    auto res = db.get(keys);
+    auto res = db.mget(keys);
 
     int found_count = 0;
     BulkStringResponse response{};
     for (auto& item : res) {
-        if (item) {
+        if (item)
             ++found_count;
-            response.add_record(item);
-        }
-        else {
-            response.add_record(std::make_shared<std::string>(""));
-        }
+        response.add_record(item);
     }
 
     log::info("MGET command executed with keys: {}, found {} values", keys, found_count);
@@ -178,15 +191,14 @@ auto flushdb(const arguments& args) -> response
         return flushdb_sync(args);
 
     log::error("FLUSHDB command received wrong number of arguments or invalid option: {}", args);
-    return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'flushdb' command");
+    return std::make_unique<ErrorResponse>(arguments_size_error("flushdb"));
 }
 
 auto dbsize(const arguments& args) -> response
 {
     if (args.size() != 1) {
         log::error("DBSIZE command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>(
-            "ERR wrong number of arguments for 'dbsize' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("dbsize"));
     }
 
     auto size = db.size();
@@ -198,13 +210,12 @@ auto expire(const arguments& args) -> response
 {
     if (args.size() != 3) {
         log::error("EXPIRE command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>(
-            "ERR wrong number of arguments for 'expire' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("expire"));
     }
 
     auto seconds = numeric_cast<std::uint64_t>(args[2]);
     if (!seconds)
-        return std::make_unique<ErrorResponse>("ERR value is not an integer or out of range");
+        return std::make_unique<ErrorResponse>(INVALID_EXPIRY_ERR);
 
     auto key = args[1];
     bool success = db.expire_at(key, *seconds);
@@ -220,7 +231,7 @@ auto ttl(const arguments& args) -> response
 
     if (args.size() != 2) {
         log::error("TTL command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'ttl' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("ttl"));
     }
 
     auto key = args[1];
@@ -243,21 +254,162 @@ auto persist(const arguments& args) -> response
 {
     if (args.size() != 2) {
         log::error("PERSIST command received wrong number of arguments: {}", args);
-        return std::make_unique<ErrorResponse>(
-            "ERR wrong number of arguments for 'persist' command");
+        return std::make_unique<ErrorResponse>(arguments_size_error("persist"));
     }
 
     auto key = args[1];
-    db.persist(key);
-    log::info("PERSIST command executed for key: {}", key);
-    return std::make_unique<IntegralResponse>(1);
+    if (db.persist(key)) {
+        log::info("PERSIST command executed for key: {}, expiration removed", key);
+        return std::make_unique<IntegralResponse>(1);
+    }
+
+    log::info("PERSIST command executed for key: {}, but key has no expiration", key);
+    return std::make_unique<IntegralResponse>(0);
+}
+
+auto create_new_hash(const arguments& args) -> response
+{
+    log::info("HSET command executed with key: {}, but key does not exist, creating new hash",
+              args[1]);
+
+    auto hash = std::make_shared<hash_type::element_type>();
+    int new_fields = 0;
+    for (size_t i = 2; i + 1 < args.size(); i += 2) {
+        auto [_, inserted] =
+            hash->insert_or_assign(args[i], std::make_shared<std::string>(args[i + 1]));
+
+        if (!inserted)
+            ++new_fields;
+    }
+
+    db.set(args[1], std::move(hash));
+
+    return std::make_unique<IntegralResponse>(new_fields);
+}
+
+auto add_to_existing_hash(const arguments& args, hash_type& container) -> response
+{
+    int new_fields = 0;
+    for (size_t i = 2; i + 1 < args.size(); i += 2) {
+        auto [_, inserted] =
+            container->insert_or_assign(args[i], std::make_shared<std::string>(args[i + 1]));
+
+        if (!inserted)
+            ++new_fields;
+    }
+
+    log::info("HSET command executed with key: {}, updated {} fields, added {} new fields", args[1],
+              container->size() - new_fields, new_fields);
+    return std::make_unique<IntegralResponse>(new_fields);
+}
+
+auto hset(const arguments& args) -> response
+{
+    if (args.size() < 4 || args.size() % 2 != 0) {
+        log::error("HSET command received wrong number of arguments: {}", args);
+        return std::make_unique<ErrorResponse>(arguments_size_error("hset"));
+    }
+
+    auto res = db.get(args[1]);
+
+    // 如果key不存在，那么就创建一个新的hash对象并插入字段值对
+    if (!res)
+        return create_new_hash(args);
+
+    // 如果key存在且是hash类型，那么就更新hash中的字段值对
+    if (auto* hash = std::get_if<hash_type>(&*res))
+        return add_to_existing_hash(args, *hash);
+
+    // 如果key存在但不是hash类型，那么就返回错误
+    log::error("HSET command executed with key: {}, but WRONGTYPE Operation against a key holding "
+               "the wrong kind of value",
+               args[1]);
+    return std::make_unique<ErrorResponse>(
+        "WRONGTYPE Operation against a key holding the wrong kind of value");
+}
+
+auto get_from_hash(const arguments& args, hash_type& container) -> response
+{
+    const auto& field = args[2];
+    auto iter = container->find(field);
+    if (iter == container->end()) {
+        log::info("HGET command executed with key: {}, field: {}, but field does not exist",
+                  args[1], field);
+        return std::make_unique<NullBulkStringResponse>();
+    }
+
+    log::info("HGET command executed with key: {}, field: {}, value found", args[1], field);
+    return std::make_unique<SingleBulkStringResponse>(iter->second);
+}
+
+auto hget(const arguments& args) -> response
+{
+    if (args.size() != 3) {
+        log::error("HGET command received wrong number of arguments: {}", args);
+        return std::make_unique<ErrorResponse>(arguments_size_error("hget"));
+    }
+
+    auto res = db.get(args[1]);
+    if (!res) {
+        log::info("HGET command executed with key: {}, field: {}, but key does not exist", args[1],
+                  args[2]);
+        return std::make_unique<NullBulkStringResponse>();
+    }
+
+    if (auto* hash = std::get_if<hash_type>(&*res))
+        return get_from_hash(args, *hash);
+
+    log::error("HGET command executed with key: {}, field: {}, but WRONGTYPE Operation against a "
+               "key holding the wrong kind of value",
+               args[1], args[2]);
+    return std::make_unique<ErrorResponse>(
+        "WRONGTYPE Operation against a key holding the wrong kind of value");
+}
+
+auto get_all_from_hash(const arguments& args, hash_type& container) -> response
+{
+    auto response = std::make_unique<BulkStringResponse>();
+    for (const auto& [field, value] : *container) {
+        log::info("HGETALL command executed with key: {}, field: {}, value: {}", args[1], field,
+                  *value);
+        response->add_record(std::make_shared<std::string>(field));
+        response->add_record(value);
+    }
+
+    log::info("HGETALL command executed with key: {}, total {} fields returned", args[1],
+              response->size() / 2);
+    return response;
+}
+
+auto hget_all(const arguments& args) -> response
+{
+    if (args.size() != 2) {
+        log::error("HGETALL command received wrong number of arguments: {}", args);
+        return std::make_unique<ErrorResponse>(arguments_size_error("hgetall"));
+    }
+
+    auto res = db.get(args[1]);
+    if (!res) {
+        log::info("HGETALL command executed with key: {}, but key does not exist", args[1]);
+        return std::make_unique<BulkStringResponse>();
+    }
+
+    if (auto* hash = std::get_if<hash_type>(&*res))
+        return get_all_from_hash(args, *hash);
+
+    log::error("HGETALL command executed with key: {}, but WRONGTYPE Operation against a "
+               "key holding the wrong kind of value",
+               args[1]);
+    return std::make_unique<ErrorResponse>(
+        "WRONGTYPE Operation against a key holding the wrong kind of value");
 }
 
 using handlers_table = std::unordered_map<std::string, handler>;
-handlers_table handlers = { { "set", set },        { "get", get },       { "ping", ping },
-                            { "keys", keys },      { "mget", mget },     { "flushdb", flushdb },
-                            { "dbsize", dbsize },  { "expire", expire }, { "ttl", ttl },
-                            { "persist", persist } };
+handlers_table handlers = { { "set", set },         { "get", get },       { "ping", ping },
+                            { "keys", keys },       { "mget", mget },     { "flushdb", flushdb },
+                            { "dbsize", dbsize },   { "expire", expire }, { "ttl", ttl },
+                            { "persist", persist }, { "hget", hget },     { "hgetall", hget_all },
+                            { "hset", hset } };
 
 } // namespace
 

@@ -96,4 +96,17 @@ TEST_SUITE("redis-command")
                   "-ERR wrong number of arguments for 'get' command\r\n");
         }
     }
+
+    TEST_CASE("mget 混合命中与未命中返回标准RESP")
+    {
+        commands::arguments set_args{ "SET", "__cmd_test_mget_k1__", "v1" };
+        const auto set_resp = commands::dispatch(set_args);
+        CHECK(response_to_string(set_resp) == "+OK\r\n");
+
+        commands::arguments mget_args{ "MGET", "__cmd_test_mget_k1__",
+                                       "__cmd_test_mget_missing__" };
+        const auto mget_resp = commands::dispatch(mget_args);
+
+        CHECK(response_to_string(mget_resp) == "*2\r\n$2\r\nv1\r\n$-1\r\n");
+    }
 }

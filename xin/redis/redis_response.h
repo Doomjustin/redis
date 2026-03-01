@@ -20,6 +20,7 @@ struct Response {
 class ErrorResponse : public Response {
 public:
     ErrorResponse(std::string_view err);
+
     [[nodiscard]]
     auto to_buffer() const -> buffers override;
 
@@ -68,6 +69,18 @@ public:
 
     [[nodiscard]]
     auto to_buffer() const -> buffers override;
+
+    [[nodiscard]]
+    constexpr auto empty() const noexcept -> bool
+    {
+        return contents_.empty();
+    }
+
+    [[nodiscard]]
+    constexpr auto size() const noexcept -> std::size_t
+    {
+        return contents_.size();
+    }
 
 private:
     std::string header_ = "*0\r\n";

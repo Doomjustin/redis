@@ -3,20 +3,22 @@
 #include <doctest/doctest.h>
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 TEST_SUITE("redis-storage")
 {
     using namespace xin::redis;
+    using string_type = Database::string_type;
+    using hash_type = Database::hash_type;
 
-    TEST_CASE("Database set/get 基本读写")
+    TEST_CASE("Database set/get_if<string_type> 基本读写")
     {
         Database db;
         db.set("k1", std::make_shared<std::string>("v1"));
 
-        auto got = db.get("k1");
+        auto got = db.get_if<string_type>("k1");
         REQUIRE(got.has_value());
-        REQUIRE(*got != nullptr);
         CHECK(**got == "v1");
     }
 
@@ -26,9 +28,8 @@ TEST_SUITE("redis-storage")
         db.set("k1", std::make_shared<std::string>("v1"));
         db.set("k1", std::make_shared<std::string>("v2"));
 
-        auto got = db.get("k1");
+        auto got = db.get_if<string_type>("k1");
         REQUIRE(got.has_value());
-        REQUIRE(*got != nullptr);
         CHECK(**got == "v2");
     }
 
@@ -38,6 +39,38 @@ TEST_SUITE("redis-storage")
         auto got = db.get("missing");
 
         CHECK_FALSE(got.has_value());
+    }
+
+    TEST_CASE("Database get_if 类型不匹配时返回空")
+    {
+        Database db;
+        auto h = std::make_shared<std::unordered_map<Database::key_type, string_type>>();
+        h->insert_or_assign("field", std::make_shared<std::string>("value"));
+        db.set("hk", h);
+
+        auto as_string = db.get_if<string_type>("hk");
+        auto as_hash = db.get_if<hash_type>("hk");
+
+        CHECK_FALSE(as_string.has_value());
+        REQUIRE(as_hash.has_value());
+        CHECK((*as_hash)->contains("field"));
+    }
+
+    TEST_CASE("Database mget 保序并对未命中返回nullptr")
+    {
+        Database db;
+        db.set("k1", std::make_shared<std::string>("v1"));
+        db.set("k3", std::make_shared<std::string>("v3"));
+
+        std::vector<Database::key_type> keys{ "k1", "k2", "k3" };
+        auto got = db.mget(keys);
+
+        REQUIRE(got.size() == 3);
+        REQUIRE(got[0] != nullptr);
+        CHECK(*got[0] == "v1");
+        CHECK(got[1] == nullptr);
+        REQUIRE(got[2] != nullptr);
+        CHECK(*got[2] == "v3");
     }
 
     TEST_CASE("Database erase 删除存在key并返回计数")
@@ -50,8 +83,8 @@ TEST_SUITE("redis-storage")
         const auto erased = db.erase(keys);
 
         CHECK(erased == 1);
-        CHECK_FALSE(db.get("k1").has_value());
-        CHECK(db.get("k2").has_value());
+        CHECK_FALSE(db.get_if<string_type>("k1").has_value());
+        CHECK(db.get_if<string_type>("k2").has_value());
     }
 
     TEST_CASE("Database expire_at 对不存在key返回false")
@@ -66,7 +99,7 @@ TEST_SUITE("redis-storage")
         db.set("k1", std::make_shared<std::string>("v1"));
 
         REQUIRE(db.expire_at("k1", 0));
-        CHECK_FALSE(db.get("k1").has_value());
+        CHECK_FALSE(db.get_if<string_type>("k1").has_value());
         CHECK_FALSE(db.ttl("k1").has_value());
     }
 
@@ -92,6 +125,6 @@ TEST_SUITE("redis-storage")
         const auto erased = db.erase(keys);
 
         CHECK(erased == 0);
-        CHECK_FALSE(db.get("k1").has_value());
+        CHECK_FALSE(db.get_if<string_type>("k1").has_value());
     }
 }

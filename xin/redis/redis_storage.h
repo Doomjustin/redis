@@ -8,14 +8,18 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <variant>
 
 namespace xin::redis {
 
 class Database {
 public:
     using key_type = std::string;
-    using value_type = std::shared_ptr<std::string>;
+    using string_type = std::shared_ptr<std::string>;
+    using hash_type = std::shared_ptr<std::unordered_map<key_type, string_type>>;
+    using value_type = std::variant<string_type, hash_type>;
     using clock = std::chrono::steady_clock;
     using time_point = clock::time_point;
     using duration = clock::duration;
@@ -23,24 +27,68 @@ public:
     using time_t = std::uint64_t;
     using size_type = std::size_t;
 
-    void set(key_type key, value_type value);
+    template<typename T>
+    static constexpr auto is_valid_value =
+        std::is_same_v<T, string_type> || std::is_same_v<T, hash_type>;
 
-    void set(key_type key, value_type value, time_t expire_seconds);
+    template<typename Result>
+        requires is_valid_value<Result>
+    void set(key_type key, Result value)
+    {
+        if (expire_time_.contains(key))
+            expire_time_.erase(key);
+
+        data_.insert_or_assign(std::move(key), std::move(value));
+    }
+
+    template<typename Value>
+        requires is_valid_value<Value>
+    void set(key_type key, Value value, time_t expire_seconds)
+    {
+        expire_time_.insert_or_assign(key, now() + expire_seconds * 1000);
+        data_.insert_or_assign(std::move(key), std::move(value));
+    }
+
+    template<typename Result>
+        requires is_valid_value<Result>
+    auto get_if(const key_type& key) -> std::optional<Result>
+    {
+        if (erase_if_expired(key))
+            return {};
+
+        auto it = data_.find(key);
+        if (it != data_.end() && std::holds_alternative<Result>(it->second))
+            return std::get<Result>(it->second);
+
+        return {};
+    }
 
     auto get(const key_type& key) -> std::optional<value_type>;
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
                  std::same_as<std::ranges::range_value_t<Range>, key_type>
-    auto get(Range&& keys) -> std::vector<value_type>
+    auto keys(Range&& keys) -> std::vector<key_type>
     {
-        std::vector<value_type> result{};
+        std::vector<key_type> result{};
         for (const auto& key : keys) {
-            auto res = get(key);
-            if (res)
-                result.emplace_back(*res);
+            if (contains(key))
+                result.push_back(key);
+        }
+        return result;
+    }
+
+    template<typename Range>
+        requires std::ranges::input_range<Range> &&
+                 std::same_as<std::ranges::range_value_t<Range>, key_type>
+    auto mget(Range&& keys) -> std::vector<string_type>
+    {
+        std::vector<string_type> result{};
+        for (const auto& key : keys) {
+            if (auto res = get_if<string_type>(key))
+                result.push_back(*res);
             else
-                result.emplace_back(nullptr);
+                result.push_back(nullptr);
         }
         return result;
     }
@@ -76,7 +124,7 @@ public:
 
     void flush_async();
 
-    void persist(const key_type& key);
+    auto persist(const key_type& key) -> bool;
 
     [[nodiscard]]
     constexpr auto size() const noexcept -> size_type

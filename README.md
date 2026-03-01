@@ -1,12 +1,12 @@
 # Redis using Modern C++
 
-用 Modern C++（C++23）实现的一个轻量 Redis 风格服务端，支持 RESP 协议解析、基础 KV 存储、过期与部分常用命令。
+用 Modern C++（C++23）实现的一个轻量 Redis 风格服务端，支持 RESP 协议解析、字符串与哈希结构、过期时间与常用命令。
 
 ## 功能特性
 
 - 基于 `asio` 协程的 TCP 服务端。
 - RESP 增量解析（支持半包场景）。
-- 内存 KV 存储，支持过期时间（TTL）。
+- 内存 KV 存储（String + Hash），支持过期时间（TTL）。
 - 支持同步/异步清空数据库。
 - 使用 `doctest` 编写单元测试。
 
@@ -54,18 +54,40 @@ redis-cli -p 16379
 - `SET key value EX seconds`
 - `GET key`
 - `MGET key [key ...]`
-- `KEYS key [key ...]`（当前实现按传入 key 列表返回）
+- `KEYS key [key ...]`（当前实现按传入 key 列表过滤存在项，不考虑支持通配符）
 - `EXPIRE key seconds`
 - `TTL key`
 - `PERSIST key`
 - `DBSIZE`
 - `FLUSHDB [SYNC|ASYNC]`
+- `HSET key field value [field value ...]`
+- `HGET key field`
+- `HGETALL key`
 
 ## 响应语义说明
 
 - `GET` 命中时返回单条 Bulk String：`$<len>\r\n<value>\r\n`
 - `GET` 未命中返回 Null Bulk String：`$-1\r\n`
-- `MGET/KEYS` 返回数组形式（RESP Array）：`*<n> ...`
+- `MGET/KEYS/HGETALL` 返回数组形式（RESP Array）：`*<n> ...`
+- `HGET` 命中返回单条 Bulk String，未命中返回 Null Bulk String
+- 类型不匹配时返回 `WRONGTYPE Operation against a key holding the wrong kind of value`
+
+## Hash 示例
+
+```text
+> HSET user:100 name tom age 10
+:2
+
+> HGET user:100 name
+$3
+tom
+
+> HGETALL user:100
+1) "name"
+2) "tom"
+3) "age"
+4) "10"
+```
 
 ## 快速示例
 

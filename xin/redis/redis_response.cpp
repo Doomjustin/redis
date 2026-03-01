@@ -68,9 +68,13 @@ auto SingleBulkStringResponse::to_buffer() const -> buffers
 
 void BulkStringResponse::add_record(std::shared_ptr<std::string> content)
 {
-    const auto content_size = content->size();
+    if (content)
+        content_size_.emplace_back(xformat("${}\r\n", content->size()));
+    else
+        content_size_.emplace_back("$-1\r\n");
+
     contents_.emplace_back(std::move(content));
-    content_size_.emplace_back(xformat("${}\r\n", content_size));
+
     header_ = xformat("*{}\r\n", contents_.size());
 }
 
@@ -81,6 +85,10 @@ auto BulkStringResponse::to_buffer() const -> buffers
 
     for (size_t i = 0; i < contents_.size(); ++i) {
         result.emplace_back(content_size_[i].data(), content_size_[i].size());
+
+        if (!contents_[i])
+            continue;
+
         result.emplace_back(contents_[i]->data(), contents_[i]->size());
         result.emplace_back(footer.data(), footer.size());
     }
