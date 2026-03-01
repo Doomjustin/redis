@@ -8,6 +8,7 @@ if(${PROJECT_NAME}_BUILD_TESTS)
     target_link_libraries(xin.test
         PRIVATE
             $<LINK_LIBRARY:WHOLE_ARCHIVE,xin::base>
+            $<LINK_LIBRARY:WHOLE_ARCHIVE,xin::redis>
             doctest::doctest
     )
 

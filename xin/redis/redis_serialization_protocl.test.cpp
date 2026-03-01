@@ -59,16 +59,16 @@ TEST_SUITE("redis-serialization-protocol")
         CHECK(result.error() == RESPParser::Error::Error);
     }
 
-    TEST_CASE("RESPParser在bulk长度与数据不一致时返回Error")
+    TEST_CASE("RESPParser在bulk数据后缀非CRLF时返回Error")
     {
-        xin::redis::RESPParser parser;
-        constexpr std::string_view req = "*1\r\n$3\r\nab\r\n";
+        RESPParser parser;
+        constexpr std::string_view req = "*1\r\n$3\r\nabc\rX";
         std::span<const char> buf{ req.data(), req.size() };
 
         auto result = parser.parse(buf);
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == xin::redis::RESPParser::Error::Error);
+        CHECK(result.error() == RESPParser::Error::Error);
     }
 
     TEST_CASE("RESPParser reset后可复用解析下一条命令")

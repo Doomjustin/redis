@@ -3,7 +3,7 @@
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
 #include <asio/use_awaitable.hpp>
-#include <fmt/core.h>
+#include <base_log.h>
 #include <redis_command.h>
 #include <redis_response.h>
 #include <redis_serialization_protocl.h>
@@ -17,6 +17,7 @@ using asio::detached;
 using asio::use_awaitable;
 using asio::ip::tcp;
 
+using xin::base::log;
 using xin::redis::RESPParser;
 using arguments = RESPParser::arguments;
 
@@ -40,11 +41,13 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
                 auto res = parser.parse(buffer_view);
 
                 if (res) {
-                    fmt::println("Command: {}", res->at(0));
+                    log::info("Command: {}", res->at(0));
 
+                    // WARNING:
+                    // 这个算是一个坑，async_write不能传给他一个临时对象buffer，必须给他一个有效的对象
                     auto response = commands::dispatch(*res);
-                    auto response_buffers = response->to_buffer();
-                    co_await asio::async_write(socket, response_buffers, use_awaitable);
+                    auto buffers = response->to_buffer();
+                    co_await asio::async_write(socket, buffers, use_awaitable);
 
                     parser.reset();
                     if (buffer_view.empty()) {
@@ -69,19 +72,19 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
     }
     catch (const asio::system_error& e) {
         if (e.code() == asio::error::eof)
-            fmt::println("Client disconnected");
+            log::info("Client disconnected");
         else
-            fmt::println("Session error: {}", e.what());
+            log::error("Session error: {}", e.what());
     }
     catch (const std::exception& e) {
-        fmt::println("Exception in Session: {}", e.what());
+        log::error("Exception in Session: {}", e.what());
     }
 }
 
 auto listener(std::uint16_t port) -> awaitable<void>
 {
     tcp::acceptor acceptor(co_await asio::this_coro::executor, tcp::endpoint(tcp::v4(), port));
-    fmt::println("Listening on port {}", port);
+    log::info("Listening on port {}", port);
 
     while (true) {
         auto socket = co_await acceptor.async_accept(use_awaitable);
@@ -100,7 +103,7 @@ int main(int argc, char* argv[])
         ctx.run();
     }
     catch (const std::exception& e) {
-        fmt::println("Server error: {}", e.what());
+        log::error("Server error: {}", e.what());
         return EXIT_FAILURE;
     }
 

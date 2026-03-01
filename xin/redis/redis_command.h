@@ -22,8 +22,6 @@ struct commands {
     static auto get(const arguments& args) -> response;
 
     static auto ping(const arguments& args) -> response;
-
-    static auto command(const arguments& args) -> response;
 };
 
 } // namespace xin::redis

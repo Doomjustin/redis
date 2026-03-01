@@ -16,6 +16,7 @@ Diagnostics:
       - "readability-implicit-bool-conversion"
       - "readability-make-member-function-const"
       - "readability-identifier-length"
+      - "readability-math-missing-parentheses"
 
 InlayHints:
   Enabled: true

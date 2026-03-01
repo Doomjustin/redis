@@ -15,8 +15,9 @@ using xin::redis::commands;
 
 std::unordered_map<std::string, commands::handler> handlers = { { "set", commands::set },
                                                                 { "get", commands::get },
-                                                                { "ping", commands::ping },
-                                                                { "command", commands::command } };
+                                                                { "ping", commands::ping } };
+
+xin::redis::Database db{};
 
 } // namespace
 
@@ -40,7 +41,7 @@ auto commands::set(const arguments& args) -> response
     if (args.size() != 3)
         return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'set' command");
 
-    storage.insert_or_assign(args[1], std::make_shared<std::string>(args[2]));
+    db.set(args[1], std::make_shared<std::string>(args[2]));
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
@@ -49,13 +50,12 @@ auto commands::get(const arguments& args) -> response
     if (args.size() != 2)
         return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'get' command");
 
-    auto it = storage.find(args[1]);
-    if (it == storage.end())
+    auto res = db.get(args[1]);
+    if (!res)
         return std::make_unique<NullBulkStringResponse>();
 
-    BulkStringResponse res{};
-    res.add_content(it->second);
-    return std::make_unique<BulkStringResponse>(std::move(res));
+    SingleBulkStringResponse response{ *res };
+    return std::make_unique<SingleBulkStringResponse>(std::move(response));
 }
 
 auto commands::ping(const arguments& args) -> response
@@ -67,11 +67,6 @@ auto commands::ping(const arguments& args) -> response
         return std::make_unique<SimpleStringResponse>(args[1]);
 
     return std::make_unique<ErrorResponse>("ERR wrong number of arguments for 'ping' command");
-}
-
-auto commands::command(const arguments& args) -> response
-{
-    return std::make_unique<ErrorResponse>("ERR unknown command 'command'");
 }
 
 } // namespace xin::redis

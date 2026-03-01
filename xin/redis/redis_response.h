@@ -49,15 +49,29 @@ private:
     std::string content_;
 };
 
+class SingleBulkStringResponse : public Response {
+public:
+    SingleBulkStringResponse(std::shared_ptr<std::string> content);
+
+    [[nodiscard]]
+    auto to_buffer() const -> buffers override;
+
+private:
+    std::string size_header_ = "$1\r\n";
+    std::shared_ptr<std::string> content_;
+};
+
 class BulkStringResponse : public Response {
 public:
-    void add_content(std::shared_ptr<std::string> content);
+    // 通过shared_ptr来避免多次复制字符串内容
+    void add_record(std::shared_ptr<std::string> content);
 
     [[nodiscard]]
     auto to_buffer() const -> buffers override;
 
 private:
     std::string header_ = "*0\r\n";
+    std::vector<std::string> content_size_;
     std::vector<std::shared_ptr<std::string>> contents_;
 };
 
