@@ -21,8 +21,11 @@ public:
     using duration = clock::duration;
     using time_unit = std::chrono::milliseconds;
     using time_t = std::uint64_t;
+    using size_type = std::size_t;
 
     void set(key_type key, value_type value);
+
+    void set(key_type key, value_type value, time_t expire_seconds);
 
     auto get(const key_type& key) -> std::optional<value_type>;
 
@@ -66,6 +69,20 @@ public:
     auto expire_at(const key_type& key, time_t seconds) -> bool;
     // time to live
     auto ttl(const key_type& key) -> std::optional<time_t>;
+
+    auto contains(const key_type& key) -> bool;
+
+    void flush();
+
+    void flush_async();
+
+    void persist(const key_type& key);
+
+    [[nodiscard]]
+    constexpr auto size() const noexcept -> size_type
+    {
+        return data_.size();
+    }
 
 private:
     std::map<key_type, value_type> data_;

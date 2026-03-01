@@ -1,5 +1,7 @@
 #include "redis_storage.h"
 
+#include <thread>
+
 namespace xin::redis {
 
 void Database::set(key_type key, value_type value)
@@ -7,6 +9,12 @@ void Database::set(key_type key, value_type value)
     if (expire_time_.contains(key))
         expire_time_.erase(key);
 
+    data_.insert_or_assign(std::move(key), std::move(value));
+}
+
+void Database::set(key_type key, value_type value, time_t seconds)
+{
+    expire_time_.insert_or_assign(key, now() + seconds * 1000);
     data_.insert_or_assign(std::move(key), std::move(value));
 }
 
@@ -43,6 +51,40 @@ auto Database::ttl(const key_type& key) -> std::optional<time_t>
     auto remaining = it->second > now() ? it->second - now() : 0;
     return remaining / 1000; // 转换为秒
 }
+
+auto Database::contains(const key_type& key) -> bool
+{
+    if (erase_if_expired(key))
+        return false;
+
+    return data_.contains(key);
+}
+
+void Database::flush()
+{
+    data_.clear();
+    expire_time_.clear();
+}
+
+void Database::flush_async()
+{
+    std::map<key_type, value_type> old_data;
+    std::unordered_map<key_type, time_t> old_expire_time;
+    std::swap(old_data, data_);
+    std::swap(old_expire_time, expire_time_);
+
+    // 在后台线程中清理旧数据
+    auto cleanup_task = [](std::map<key_type, value_type> old_data,
+                           std::unordered_map<key_type, time_t> old_expire_time) {
+        old_data.clear();
+        old_expire_time.clear();
+    };
+
+    std::thread t{ cleanup_task, std::move(old_data), std::move(old_expire_time) };
+    t.detach();
+}
+
+void Database::persist(const key_type& key) { expire_time_.erase(key); }
 
 auto Database::now() -> time_t
 {
