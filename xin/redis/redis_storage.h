@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <concepts>
+#include <list>
 #include <map>
 #include <memory>
 #include <optional>
@@ -19,7 +20,8 @@ public:
     using key_type = std::string;
     using string_type = std::shared_ptr<std::string>;
     using hash_type = std::shared_ptr<std::unordered_map<key_type, string_type>>;
-    using value_type = std::variant<string_type, hash_type>;
+    using list_type = std::shared_ptr<std::list<string_type>>;
+    using value_type = std::variant<string_type, hash_type, list_type>;
     using clock = std::chrono::steady_clock;
     using time_point = clock::time_point;
     using duration = clock::duration;
@@ -29,11 +31,12 @@ public:
 
     template<typename T>
     static constexpr auto is_valid_value =
-        std::is_same_v<T, string_type> || std::is_same_v<T, hash_type>;
+        std::is_same_v<T, string_type> || std::is_same_v<T, hash_type> ||
+        std::is_same_v<T, list_type>;
 
-    template<typename Result>
-        requires is_valid_value<Result>
-    void set(key_type key, Result value)
+    template<typename Value>
+        requires is_valid_value<Value>
+    void set(key_type key, Value value)
     {
         if (expire_time_.contains(key))
             expire_time_.erase(key);
@@ -49,16 +52,16 @@ public:
         data_.insert_or_assign(std::move(key), std::move(value));
     }
 
-    template<typename Result>
-        requires is_valid_value<Result>
-    auto get_if(const key_type& key) -> std::optional<Result>
+    template<typename Value>
+        requires is_valid_value<Value>
+    auto get_if(const key_type& key) -> std::optional<Value>
     {
         if (erase_if_expired(key))
             return {};
 
         auto it = data_.find(key);
-        if (it != data_.end() && std::holds_alternative<Result>(it->second))
-            return std::get<Result>(it->second);
+        if (it != data_.end() && std::holds_alternative<Value>(it->second))
+            return std::get<Value>(it->second);
 
         return {};
     }

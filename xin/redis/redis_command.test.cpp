@@ -6,6 +6,15 @@
 
 namespace {
 
+auto starts_with(const std::string& value, const std::string& prefix) -> bool
+{
+    return value.rfind(prefix, 0) == 0;
+}
+
+} // namespace
+
+namespace {
+
 auto response_to_string(const xin::redis::commands::response& resp) -> std::string
 {
     std::string out;
@@ -108,5 +117,82 @@ TEST_SUITE("redis-command")
         const auto mget_resp = commands::dispatch(mget_args);
 
         CHECK(response_to_string(mget_resp) == "*2\r\n$2\r\nv1\r\n$-1\r\n");
+    }
+
+    TEST_CASE("persist 在有过期和无过期时返回正确整数")
+    {
+        {
+            commands::arguments set_ex{ "SET", "__cmd_test_persist_k1__", "v1", "EX", "60" };
+            CHECK(response_to_string(commands::dispatch(set_ex)) == "+OK\r\n");
+
+            commands::arguments persist{ "PERSIST", "__cmd_test_persist_k1__" };
+            CHECK(response_to_string(commands::dispatch(persist)) == ":1\r\n");
+        }
+
+        {
+            commands::arguments set_plain{ "SET", "__cmd_test_persist_k2__", "v2" };
+            CHECK(response_to_string(commands::dispatch(set_plain)) == "+OK\r\n");
+
+            commands::arguments persist{ "PERSIST", "__cmd_test_persist_k2__" };
+            CHECK(response_to_string(commands::dispatch(persist)) == ":0\r\n");
+        }
+    }
+
+    TEST_CASE("hset/hget 基本行为")
+    {
+        commands::arguments hset_args{ "HSET", "__cmd_test_hash_1__", "name", "tom", "age", "10" };
+        CHECK(response_to_string(commands::dispatch(hset_args)) == ":2\r\n");
+
+        commands::arguments hget_name{ "HGET", "__cmd_test_hash_1__", "name" };
+        CHECK(response_to_string(commands::dispatch(hget_name)) == "$3\r\ntom\r\n");
+
+        commands::arguments hget_missing{ "HGET", "__cmd_test_hash_1__", "missing" };
+        CHECK(response_to_string(commands::dispatch(hget_missing)) == "$-1\r\n");
+    }
+
+    TEST_CASE("hset 更新已有字段返回新增数量")
+    {
+        commands::arguments hset_init{ "HSET", "__cmd_test_hash_2__", "name", "tom" };
+        CHECK(response_to_string(commands::dispatch(hset_init)) == ":1\r\n");
+
+        commands::arguments hset_update{ "HSET", "__cmd_test_hash_2__", "name", "jerry", "city",
+                                         "sh" };
+        CHECK(response_to_string(commands::dispatch(hset_update)) == ":1\r\n");
+
+        commands::arguments hget_name{ "HGET", "__cmd_test_hash_2__", "name" };
+        CHECK(response_to_string(commands::dispatch(hget_name)) == "$5\r\njerry\r\n");
+    }
+
+    TEST_CASE("hgetall 返回 field-value 交替数组")
+    {
+        commands::arguments hset_args{ "HSET", "__cmd_test_hash_3__", "f1", "v1", "f2", "v2" };
+        CHECK(response_to_string(commands::dispatch(hset_args)) == ":2\r\n");
+
+        commands::arguments hgetall{ "HGETALL", "__cmd_test_hash_3__" };
+        auto res = response_to_string(commands::dispatch(hgetall));
+
+        CHECK(starts_with(res, "*4\r\n"));
+        CHECK(res.find("$2\r\nf1\r\n") != std::string::npos);
+        CHECK(res.find("$2\r\nv1\r\n") != std::string::npos);
+        CHECK(res.find("$2\r\nf2\r\n") != std::string::npos);
+        CHECK(res.find("$2\r\nv2\r\n") != std::string::npos);
+    }
+
+    TEST_CASE("hgetall 不存在key返回空数组")
+    {
+        commands::arguments hgetall{ "HGETALL", "__cmd_test_hash_missing__" };
+        CHECK(response_to_string(commands::dispatch(hgetall)) == "*0\r\n");
+    }
+
+    TEST_CASE("lpush 和 lpop 顺序符合Redis语义")
+    {
+        commands::arguments lpush_args{ "LPUSH", "__cmd_test_list_1__", "a", "b", "c" };
+        CHECK(response_to_string(commands::dispatch(lpush_args)) == ":3\r\n");
+
+        commands::arguments lpop{ "LPOP", "__cmd_test_list_1__" };
+        CHECK(response_to_string(commands::dispatch(lpop)) == "$1\r\nc\r\n");
+        CHECK(response_to_string(commands::dispatch(lpop)) == "$1\r\nb\r\n");
+        CHECK(response_to_string(commands::dispatch(lpop)) == "$1\r\na\r\n");
+        CHECK(response_to_string(commands::dispatch(lpop)) == "$-1\r\n");
     }
 }

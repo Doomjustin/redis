@@ -21,9 +21,10 @@ using namespace xin::redis;
 using namespace xin::base;
 using arguments = commands::arguments;
 using response = commands::response;
+using handler = std::function<response(const arguments&)>;
 using string_type = Database::string_type;
 using hash_type = Database::hash_type;
-using handler = std::function<response(const arguments&)>;
+using list_type = Database::list_type;
 
 xin::redis::Database db{};
 
@@ -272,7 +273,7 @@ auto create_new_hash(const arguments& args) -> response
     log::info("HSET command executed with key: {}, but key does not exist, creating new hash",
               args[1]);
 
-    auto hash = std::make_shared<hash_type::element_type>();
+    auto hash = std::make_shared<std::unordered_map<std::string, string_type>>();
     int new_fields = 0;
     for (size_t i = 2; i + 1 < args.size(); i += 2) {
         auto [_, inserted] =
@@ -404,12 +405,90 @@ auto hget_all(const arguments& args) -> response
         "WRONGTYPE Operation against a key holding the wrong kind of value");
 }
 
+auto create_new_list(const arguments& args) -> response
+{
+    log::info("LPUSH command executed with key: {}, but key does not exist, creating new list",
+              args[1]);
+
+    auto list = std::make_shared<list_type::element_type>();
+    for (size_t i = 2; i < args.size(); ++i)
+        list->push_front(std::make_shared<std::string>(args[i]));
+
+    db.set(args[1], std::move(list));
+
+    return std::make_unique<IntegralResponse>(args.size() - 2);
+}
+
+auto add_to_existing_list(const arguments& args, list_type& container) -> response
+{
+    for (size_t i = 2; i < args.size(); ++i)
+        container->push_front(std::make_shared<std::string>(args[i]));
+
+    log::info("LPUSH command executed with key: {}, added {} elements to existing list", args[1],
+              args.size() - 2);
+    return std::make_unique<IntegralResponse>(container->size());
+}
+
+auto lpush(const arguments& args) -> response
+{
+    if (args.size() < 3) {
+        log::error("LPUSH command received wrong number of arguments: {}", args);
+        return std::make_unique<ErrorResponse>(arguments_size_error("lpush"));
+    }
+
+    auto res = db.get(args[1]);
+    if (!res)
+        return create_new_list(args);
+
+    if (auto* list = std::get_if<list_type>(&*res))
+        return add_to_existing_list(args, *list);
+
+    log::error("LPUSH command executed with key: {}, but WRONGTYPE Operation against a "
+               "key holding the wrong kind of value",
+               args[1]);
+    return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
+}
+
+auto lpop(const arguments& args) -> response
+{
+    if (args.size() != 2) {
+        log::error("LPOP command received wrong number of arguments: {}", args);
+        return std::make_unique<ErrorResponse>(arguments_size_error("lpop"));
+    }
+
+    auto res = db.get(args[1]);
+    if (!res) {
+        log::info("LPOP command executed with key: {}, but key does not exist", args[1]);
+        return std::make_unique<NullBulkStringResponse>();
+    }
+
+    if (auto* list = std::get_if<list_type>(&*res)) {
+        auto& container = *list;
+
+        if (container->empty()) {
+            log::info("LPOP command executed with key: {}, but list is empty", args[1]);
+            return std::make_unique<NullBulkStringResponse>();
+        }
+
+        auto value = container->front();
+        container->pop_front();
+
+        log::info("LPOP command executed with key: {}, popped value: {}", args[1], *value);
+        return std::make_unique<SingleBulkStringResponse>(value);
+    }
+
+    log::error("LPOP command executed with key: {}, but WRONGTYPE Operation against a "
+               "key holding the wrong kind of value",
+               args[1]);
+    return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
+}
+
 using handlers_table = std::unordered_map<std::string, handler>;
 handlers_table handlers = { { "set", set },         { "get", get },       { "ping", ping },
                             { "keys", keys },       { "mget", mget },     { "flushdb", flushdb },
                             { "dbsize", dbsize },   { "expire", expire }, { "ttl", ttl },
                             { "persist", persist }, { "hget", hget },     { "hgetall", hget_all },
-                            { "hset", hset } };
+                            { "hset", hset },       { "lpush", lpush },   { "lpop", lpop } };
 
 } // namespace
 

@@ -1,12 +1,12 @@
 # Redis using Modern C++
 
-用 Modern C++（C++23）实现的一个轻量 Redis 风格服务端，支持 RESP 协议解析、字符串与哈希结构、过期时间与常用命令。
+用 Modern C++（C++23）实现的一个轻量 Redis 风格服务端，支持 RESP 协议解析、字符串/哈希/列表结构、过期时间与常用命令。
 
 ## 功能特性
 
 - 基于 `asio` 协程的 TCP 服务端。
 - RESP 增量解析（支持半包场景）。
-- 内存 KV 存储（String + Hash），支持过期时间（TTL）。
+- 内存 KV 存储（String + Hash + List），支持过期时间（TTL）。
 - 支持同步/异步清空数据库。
 - 使用 `doctest` 编写单元测试。
 
@@ -63,6 +63,8 @@ redis-cli -p 16379
 - `HSET key field value [field value ...]`
 - `HGET key field`
 - `HGETALL key`
+- `LPUSH key element [element ...]`
+- `LPOP key`
 
 ## 响应语义说明
 
@@ -70,6 +72,7 @@ redis-cli -p 16379
 - `GET` 未命中返回 Null Bulk String：`$-1\r\n`
 - `MGET/KEYS/HGETALL` 返回数组形式（RESP Array）：`*<n> ...`
 - `HGET` 命中返回单条 Bulk String，未命中返回 Null Bulk String
+- `LPOP` 成功返回单条 Bulk String，列表为空或 key 不存在返回 Null Bulk String
 - 类型不匹配时返回 `WRONGTYPE Operation against a key holding the wrong kind of value`
 
 ## Hash 示例
@@ -89,6 +92,21 @@ tom
 4) "10"
 ```
 
+## List 示例
+
+```text
+> LPUSH queue a b c
+:3
+
+> LPOP queue
+$1
+c
+
+> LPOP queue
+$1
+b
+```
+
 ## 快速示例
 
 ```text
@@ -105,6 +123,12 @@ xin
 > TTL name
 :9
 ```
+
+## 兼容性说明
+
+- `HGETALL` 在 key 不存在时返回空数组（`*0`）。
+- `HSET` 返回本次新增字段数量（更新已有字段不计入新增）。
+- `LPUSH` 头插，`LPOP` 从头弹出，行为与 Redis 左侧语义一致。
 
 ## 测试
 

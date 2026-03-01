@@ -72,6 +72,8 @@
         "inttypes",
         "iomanip",
         "iosfwd",
+        "lpush",
+        "LPUSH",
         "MGET",
         "mqueue",
         "netdb",
