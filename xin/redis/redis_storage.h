@@ -29,6 +29,22 @@ public:
     template<typename Range>
         requires std::ranges::input_range<Range> &&
                  std::same_as<std::ranges::range_value_t<Range>, key_type>
+    auto get(Range&& keys) -> std::vector<value_type>
+    {
+        std::vector<value_type> result{};
+        for (const auto& key : keys) {
+            auto res = get(key);
+            if (res)
+                result.emplace_back(*res);
+            else
+                result.emplace_back(nullptr);
+        }
+        return result;
+    }
+
+    template<typename Range>
+        requires std::ranges::input_range<Range> &&
+                 std::same_as<std::ranges::range_value_t<Range>, key_type>
     auto erase(Range&& keys) -> int
     {
         int count = 0;
