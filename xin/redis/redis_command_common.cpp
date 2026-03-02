@@ -7,7 +7,7 @@ using namespace xin::base;
 
 namespace xin::redis {
 
-auto common_commands::ping(const arguments& args) -> response
+auto common_commands::ping(const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 1) {
         log::info("PING command executed with no arguments, responding with PONG");
@@ -23,7 +23,7 @@ auto common_commands::ping(const arguments& args) -> response
     return std::make_unique<ErrorResponse>(arguments_size_error("ping"));
 }
 
-auto common_commands::keys(const arguments& args) -> response
+auto common_commands::keys(const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 2) {
         log::error("KEYS command received wrong number of arguments: {}", args);
@@ -42,7 +42,7 @@ auto common_commands::keys(const arguments& args) -> response
     return std::make_unique<BulkStringResponse>(std::move(response));
 }
 
-auto common_commands::mget(const arguments& args) -> response
+auto common_commands::mget(const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 2) {
         log::error("MGET command received wrong number of arguments: {}", args);
@@ -65,21 +65,21 @@ auto common_commands::mget(const arguments& args) -> response
     return std::make_unique<BulkStringResponse>(std::move(response));
 }
 
-auto flushdb_async(const arguments& args) -> response
+auto flushdb_async(const Arguments& args) -> ResponsePtr
 {
     db().flush_async();
     log::info("FLUSHdb() ASYNC command executed, database clearing initiated in background");
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
-auto flushdb_sync(const arguments& args) -> response
+auto flushdb_sync(const Arguments& args) -> ResponsePtr
 {
     db().flush();
     log::info("FLUSHdb() SYNC command executed, database cleared");
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
-auto common_commands::flushdb(const arguments& args) -> response
+auto common_commands::flushdb(const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 1)
         return flushdb_sync(args);
@@ -94,7 +94,7 @@ auto common_commands::flushdb(const arguments& args) -> response
     return std::make_unique<ErrorResponse>(arguments_size_error("flushdb()"));
 }
 
-auto common_commands::dbsize(const arguments& args) -> response
+auto common_commands::dbsize(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 1) {
         log::error("dbsize command received wrong number of arguments: {}", args);
@@ -106,7 +106,7 @@ auto common_commands::dbsize(const arguments& args) -> response
     return std::make_unique<IntegralResponse>(size);
 }
 
-auto common_commands::expire(const arguments& args) -> response
+auto common_commands::expire(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 3) {
         log::error("EXPIRE command received wrong number of arguments: {}", args);
@@ -115,7 +115,7 @@ auto common_commands::expire(const arguments& args) -> response
 
     auto seconds = numeric_cast<std::uint64_t>(args[2]);
     if (!seconds)
-        return std::make_unique<ErrorResponse>(INVALID_EXPIRY_ERR);
+        return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
 
     auto key = args[1];
     bool success = db().expire_at(key, *seconds);
@@ -124,7 +124,7 @@ auto common_commands::expire(const arguments& args) -> response
     return std::make_unique<IntegralResponse>(success ? 1 : 0);
 }
 
-auto common_commands::ttl(const arguments& args) -> response
+auto common_commands::ttl(const Arguments& args) -> ResponsePtr
 {
     constexpr int key_not_exist = -2;
     constexpr int key_no_expire = -1;
@@ -150,7 +150,7 @@ auto common_commands::ttl(const arguments& args) -> response
     return std::make_unique<IntegralResponse>(*res);
 }
 
-auto common_commands::persist(const arguments& args) -> response
+auto common_commands::persist(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
         log::error("PERSIST command received wrong number of arguments: {}", args);

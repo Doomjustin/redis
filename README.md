@@ -65,6 +65,8 @@ redis-cli -p 16379
 - `HGETALL key`
 - `LPUSH key element [element ...]`
 - `LPOP key`
+- `ZADD key score member [score member ...]`
+- `ZRANGE key start stop [WITHSCORES]` (当前实现用的std::set，只能顺序读，所以查找性能不如skip_list的随机读)
 
 ## 响应语义说明
 
@@ -107,6 +109,23 @@ $1
 b
 ```
 
+## Sorted Set 示例
+
+```text
+> ZADD rank 100 alice 95 bob
+:2
+
+> ZRANGE rank 0 -1
+1) "bob"
+2) "alice"
+
+> ZRANGE rank 0 -1 WITHSCORES
+1) "bob"
+2) "95"
+3) "alice"
+4) "100"
+```
+
 ## 快速示例
 
 ```text
@@ -129,6 +148,7 @@ xin
 - `HGETALL` 在 key 不存在时返回空数组（`*0`）。
 - `HSET` 返回本次新增字段数量（更新已有字段不计入新增）。
 - `LPUSH` 头插，`LPOP` 从头弹出，行为与 Redis 左侧语义一致。
+- `ZRANGE ... WITHSCORES` 以“成员、分数”交替返回，分数以字符串表示。
 
 ## 测试
 

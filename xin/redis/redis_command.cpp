@@ -1,17 +1,16 @@
 #include "redis_command.h"
 
-#include "redis_command_common.h"
-#include "redis_command_define.h"
-#include "redis_command_hash_table.h"
-#include "redis_command_list.h"
-#include "redis_command_set.h"
-#include "redis_command_string.h"
-#include "redis_response.h"
-
 #include <base_formats.h>
 #include <base_log.h>
 #include <base_string_utility.h>
 #include <fmt/core.h>
+#include <redis_command_common.h>
+#include <redis_command_define.h>
+#include <redis_command_hash_table.h>
+#include <redis_command_list.h>
+#include <redis_command_sorted_set.h>
+#include <redis_command_string.h>
+#include <redis_response.h>
 
 #include <memory>
 #include <string>
@@ -22,7 +21,7 @@ namespace {
 using namespace xin::redis;
 using namespace xin::base;
 
-using handlers_table = std::unordered_map<std::string, handler>;
+using handlers_table = std::unordered_map<std::string, Handler>;
 handlers_table handlers = {
     { "set", string_commands::set },       { "get", string_commands::get },
     { "ping", common_commands::ping },     { "keys", common_commands::keys },
@@ -31,14 +30,15 @@ handlers_table handlers = {
     { "ttl", common_commands::ttl },       { "persist", common_commands::persist },
     { "hget", hash_table_commands::get },  { "hgetall", hash_table_commands::get_all },
     { "hset", hash_table_commands::set },  { "lpush", list_commands::push },
-    { "lpop", list_commands::pop },        { "lrange", list_commands::range }
+    { "lpop", list_commands::pop },        { "lrange", list_commands::range },
+    { "zadd", sorted_set_commands::add },  { "zrange", sorted_set_commands::range },
 };
 
 } // namespace
 
 namespace xin::redis {
 
-auto commands::dispatch(const arguments& args) -> response
+auto commands::dispatch(const Arguments& args) -> ResponsePtr
 {
     if (args.empty())
         return std::make_unique<ErrorResponse>("ERR empty command");

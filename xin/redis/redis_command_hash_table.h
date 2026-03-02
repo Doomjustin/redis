@@ -1,7 +1,7 @@
 #ifndef XIN_REDIS_COMMAND_HASH_TABLE_H
 #define XIN_REDIS_COMMAND_HASH_TABLE_H
 
-#include "redis_command_define.h"
+#include <redis_command_define.h>
 
 namespace xin::redis {
 
@@ -17,7 +17,7 @@ struct hash_table_commands {
     // The command returns the number of fields that were added to the hash, not including fields
     // that were overwritten. If the command is called with an odd number of arguments, or if the
     // number of arguments is less than 4, an error is returned.
-    static auto set(const arguments& args) -> response;
+    static auto set(const Arguments& args) -> ResponsePtr;
 
     // hget key field
     // If the key does not exist, it returns a Null Bulk String.
@@ -25,7 +25,7 @@ struct hash_table_commands {
     // If the key exists and holds a hash value, but the specified field does not exist in the hash,
     // it returns a Null Bulk String. If the key exists and holds a hash value, and the specified
     // field exists in the hash, it returns the value associated with the specified field.
-    static auto get(const arguments& args) -> response;
+    static auto get(const Arguments& args) -> ResponsePtr;
 
     // hgetall key
     // If the key does not exist, it returns an empty list.
@@ -34,7 +34,7 @@ struct hash_table_commands {
     // values stored in the hash, in the form of a list where every field name is followed by its
     // value. Because of this, the number of elements in the returned list is twice the number of
     // fields in the hash.
-    static auto get_all(const arguments& args) -> response;
+    static auto get_all(const Arguments& args) -> ResponsePtr;
 };
 
 } // namespace xin::redis

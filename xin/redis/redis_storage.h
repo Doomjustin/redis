@@ -1,6 +1,8 @@
 #ifndef XIN_REDIS_STORAGE_H
 #define XIN_REDIS_STORAGE_H
 
+#include <redis_sorted_set.h>
+
 #include <chrono>
 #include <concepts>
 #include <list>
@@ -17,44 +19,45 @@ namespace xin::redis {
 
 class Database {
 public:
-    using key_type = std::string;
-    using string_type = std::shared_ptr<std::string>;
-    using hash_type = std::shared_ptr<std::unordered_map<key_type, string_type>>;
-    using list_type = std::shared_ptr<std::list<string_type>>;
-    using value_type = std::variant<string_type, hash_type, list_type>;
-    using clock = std::chrono::steady_clock;
-    using time_point = clock::time_point;
-    using duration = clock::duration;
-    using time_unit = std::chrono::milliseconds;
-    using time_t = std::uint64_t;
-    using size_type = std::size_t;
+    using KeyType = std::string;
+    using StringType = std::string;
+    using StringPtr = std::shared_ptr<StringType>;
+    using HashType = std::unordered_map<KeyType, StringPtr>;
+    using HashPtr = std::shared_ptr<HashType>;
+    using ListType = std::list<StringPtr>;
+    using ListPtr = std::shared_ptr<ListType>;
+    using SortedSetType = SortedSet;
+    using SortedSetPtr = std::shared_ptr<SortedSetType>;
+    using ValueType = std::variant<StringPtr, HashPtr, ListPtr, SortedSetPtr>;
+    using SizeType = std::size_t;
+    using Seconds = std::uint64_t;
 
     template<typename T>
     static constexpr auto is_valid_value =
-        std::is_same_v<T, string_type> || std::is_same_v<T, hash_type> ||
-        std::is_same_v<T, list_type>;
+        std::is_same_v<T, StringPtr> || std::is_same_v<T, HashPtr> || std::is_same_v<T, ListPtr> ||
+        std::is_same_v<T, SortedSetPtr>;
 
     template<typename Value>
         requires is_valid_value<Value>
-    void set(key_type key, Value value)
+    void set(const KeyType& key, Value value)
     {
         if (expire_time_.contains(key))
             expire_time_.erase(key);
 
-        data_.insert_or_assign(std::move(key), std::move(value));
+        data_.insert_or_assign(key, std::move(value));
     }
 
     template<typename Value>
         requires is_valid_value<Value>
-    void set(key_type key, Value value, time_t expire_seconds)
+    void set(const KeyType& key, Value value, Seconds expire_seconds)
     {
         expire_time_.insert_or_assign(key, now() + expire_seconds * 1000);
-        data_.insert_or_assign(std::move(key), std::move(value));
+        data_.insert_or_assign(key, std::move(value));
     }
 
     template<typename Value>
         requires is_valid_value<Value>
-    auto get_if(const key_type& key) -> std::optional<Value>
+    auto get_if(const KeyType& key) -> std::optional<Value>
     {
         if (erase_if_expired(key))
             return {};
@@ -66,14 +69,14 @@ public:
         return {};
     }
 
-    auto get(const key_type& key) -> std::optional<value_type>;
+    auto get(const KeyType& key) -> std::optional<ValueType>;
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
-                 std::same_as<std::ranges::range_value_t<Range>, key_type>
-    auto keys(Range&& keys) -> std::vector<key_type>
+                 std::same_as<std::ranges::range_value_t<Range>, KeyType>
+    auto keys(Range&& keys) -> std::vector<KeyType>
     {
-        std::vector<key_type> result{};
+        std::vector<KeyType> result{};
         for (const auto& key : keys) {
             if (contains(key))
                 result.push_back(key);
@@ -83,12 +86,12 @@ public:
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
-                 std::same_as<std::ranges::range_value_t<Range>, key_type>
-    auto mget(Range&& keys) -> std::vector<string_type>
+                 std::same_as<std::ranges::range_value_t<Range>, KeyType>
+    auto mget(Range&& keys) -> std::vector<StringPtr>
     {
-        std::vector<string_type> result{};
+        std::vector<StringPtr> result{};
         for (const auto& key : keys) {
-            if (auto res = get_if<string_type>(key))
+            if (auto res = get_if<StringPtr>(key))
                 result.push_back(*res);
             else
                 result.push_back(nullptr);
@@ -98,7 +101,7 @@ public:
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
-                 std::same_as<std::ranges::range_value_t<Range>, key_type>
+                 std::same_as<std::ranges::range_value_t<Range>, KeyType>
     auto erase(Range&& keys) -> int
     {
         int count = 0;
@@ -117,33 +120,36 @@ public:
         return count;
     }
 
-    auto expire_at(const key_type& key, time_t seconds) -> bool;
+    auto expire_at(const KeyType& key, Seconds seconds) -> bool;
     // time to live
-    auto ttl(const key_type& key) -> std::optional<time_t>;
+    auto ttl(const KeyType& key) -> std::optional<Seconds>;
 
-    auto contains(const key_type& key) -> bool;
+    auto contains(const KeyType& key) -> bool;
 
     void flush();
 
     void flush_async();
 
-    auto persist(const key_type& key) -> bool;
+    auto persist(const KeyType& key) -> bool;
 
     [[nodiscard]]
-    constexpr auto size() const noexcept -> size_type
+    constexpr auto size() const noexcept -> SizeType
     {
         return data_.size();
     }
 
 private:
-    using data_container = std::unordered_map<key_type, value_type>;
-    using expire_container = std::unordered_map<key_type, time_t>;
-    data_container data_;
-    expire_container expire_time_;
+    using Clock = std::chrono::steady_clock;
+    using TimeUnit = std::chrono::milliseconds;
+    using Datas = std::unordered_map<KeyType, ValueType>;
+    using Expires = std::unordered_map<KeyType, Seconds>;
 
-    static auto now() -> time_t;
+    Datas data_;
+    Expires expire_time_;
 
-    auto erase_if_expired(const key_type& key) -> bool;
+    static auto now() -> Seconds;
+
+    auto erase_if_expired(const KeyType& key) -> bool;
 };
 
 } // namespace xin::redis

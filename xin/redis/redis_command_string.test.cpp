@@ -1,14 +1,13 @@
 #include "redis_command_string.h"
 
-#include "redis_command_list.h"
-
 #include <doctest/doctest.h>
+#include <redis_command_list.h>
 
 #include <string>
 
 namespace {
 
-auto response_to_string(const xin::redis::response& resp) -> std::string
+auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
 {
     std::string out;
     for (const auto& buffer : resp->to_buffer())
@@ -21,7 +20,7 @@ auto response_to_string(const xin::redis::response& resp) -> std::string
 
 TEST_SUITE("redis-command-string")
 {
-    using xin::redis::arguments;
+    using xin::redis::Arguments;
     using xin::redis::db;
     using xin::redis::list_commands;
     using xin::redis::string_commands;
@@ -30,16 +29,16 @@ TEST_SUITE("redis-command-string")
     {
         db().flush();
 
-        CHECK(response_to_string(string_commands::set(arguments{ "SET", "__string_k1__", "v1" })) ==
+        CHECK(response_to_string(string_commands::set(Arguments{ "SET", "__string_k1__", "v1" })) ==
               "+OK\r\n");
-        CHECK(response_to_string(string_commands::get(arguments{ "GET", "__string_k1__" })) ==
+        CHECK(response_to_string(string_commands::get(Arguments{ "GET", "__string_k1__" })) ==
               "$2\r\nv1\r\n");
     }
 
     TEST_CASE("get missing key returns null bulk")
     {
         db().flush();
-        CHECK(response_to_string(string_commands::get(arguments{ "GET", "__string_missing__" })) ==
+        CHECK(response_to_string(string_commands::get(Arguments{ "GET", "__string_missing__" })) ==
               "$-1\r\n");
     }
 
@@ -47,17 +46,17 @@ TEST_SUITE("redis-command-string")
     {
         db().flush();
         CHECK(response_to_string(string_commands::set(
-                  arguments{ "SET", "__string_ex_k1__", "v1", "EX", "60" })) == "+OK\r\n");
+                  Arguments{ "SET", "__string_ex_k1__", "v1", "EX", "60" })) == "+OK\r\n");
     }
 
     TEST_CASE("set and get argument validation")
     {
-        CHECK(response_to_string(string_commands::set(arguments{ "SET", "k_only" })) ==
-              "-ERR wrong number of arguments for 'set' command\r\n");
-        CHECK(response_to_string(string_commands::get(arguments{ "GET" })) ==
-              "-ERR wrong number of arguments for 'get' command\r\n");
+        CHECK(response_to_string(string_commands::set(Arguments{ "SET", "k_only" })) ==
+              "-ERR wrong number of Arguments for 'set' command\r\n");
+        CHECK(response_to_string(string_commands::get(Arguments{ "GET" })) ==
+              "-ERR wrong number of Arguments for 'get' command\r\n");
         CHECK(response_to_string(
-                  string_commands::set(arguments{ "SET", "k", "v", "EX", "not_int" })) ==
+                  string_commands::set(Arguments{ "SET", "k", "v", "EX", "not_int" })) ==
               "-ERR value is not an integer or out of range\r\n");
     }
 
@@ -65,10 +64,10 @@ TEST_SUITE("redis-command-string")
     {
         db().flush();
         CHECK(response_to_string(list_commands::push(
-                  arguments{ "LPUSH", "__string_wrongtype_k1__", "a" })) == ":1\r\n");
+                  Arguments{ "LPUSH", "__string_wrongtype_k1__", "a" })) == ":1\r\n");
 
         CHECK(response_to_string(
-                  string_commands::get(arguments{ "GET", "__string_wrongtype_k1__" })) ==
+                  string_commands::get(Arguments{ "GET", "__string_wrongtype_k1__" })) ==
               "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n");
     }
 }

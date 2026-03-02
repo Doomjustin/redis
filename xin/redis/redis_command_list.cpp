@@ -1,5 +1,7 @@
 #include "redis_command_list.h"
 
+#include "redis_command_define.h"
+
 #include <base_log.h>
 
 using namespace xin::base;
@@ -8,12 +10,12 @@ namespace {
 
 using namespace xin::redis;
 
-auto create_new_list(const arguments& args) -> response
+auto create_new_list(const Arguments& args) -> ResponsePtr
 {
     log::info("LPUSH command executed with key: {}, but key does not exist, creating new list",
               args[1]);
 
-    auto list = std::make_shared<list_type::element_type>();
+    auto list = std::make_shared<ListPtr::element_type>();
     for (size_t i = 2; i < args.size(); ++i)
         list->push_front(std::make_shared<std::string>(args[i]));
 
@@ -22,21 +24,21 @@ auto create_new_list(const arguments& args) -> response
     return std::make_unique<IntegralResponse>(args.size() - 2);
 }
 
-auto add_to_existing_list(const arguments& args, list_type& container) -> response
+auto add_to_existing_list(const Arguments& args, ListType& container) -> ResponsePtr
 {
     for (size_t i = 2; i < args.size(); ++i)
-        container->push_front(std::make_shared<std::string>(args[i]));
+        container.push_front(std::make_shared<std::string>(args[i]));
 
     log::info("LPUSH command executed with key: {}, added {} elements to existing list", args[1],
               args.size() - 2);
-    return std::make_unique<IntegralResponse>(container->size());
+    return std::make_unique<IntegralResponse>(container.size());
 }
 
 } // namespace
 
 namespace xin::redis {
 
-auto list_commands::push(const arguments& args) -> response
+auto list_commands::push(const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 3) {
         log::error("LPUSH command received wrong number of arguments: {}", args);
@@ -47,8 +49,8 @@ auto list_commands::push(const arguments& args) -> response
     if (!res)
         return create_new_list(args);
 
-    if (auto* list = std::get_if<list_type>(&*res))
-        return add_to_existing_list(args, *list);
+    if (auto* list = std::get_if<ListPtr>(&*res))
+        return add_to_existing_list(args, **list);
 
     log::error("LPUSH command executed with key: {}, but WRONGTYPE Operation against a "
                "key holding the wrong kind of value",
@@ -56,7 +58,7 @@ auto list_commands::push(const arguments& args) -> response
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
-auto list_commands::pop(const arguments& args) -> response
+auto list_commands::pop(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
         log::error("LPOP command received wrong number of arguments: {}", args);
@@ -69,7 +71,7 @@ auto list_commands::pop(const arguments& args) -> response
         return std::make_unique<NullBulkStringResponse>();
     }
 
-    if (auto* list = std::get_if<list_type>(&*res)) {
+    if (auto* list = std::get_if<ListPtr>(&*res)) {
         auto& container = **list;
 
         if (container.empty()) {
@@ -90,7 +92,7 @@ auto list_commands::pop(const arguments& args) -> response
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
-auto list_commands::range(const arguments& args) -> response
+auto list_commands::range(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 4) {
         log::error("LRANGE command received wrong number of arguments: {}", args);
@@ -103,7 +105,7 @@ auto list_commands::range(const arguments& args) -> response
         return std::make_unique<BulkStringResponse>();
     }
 
-    if (auto* list = std::get_if<list_type>(&*res)) {
+    if (auto* list = std::get_if<ListPtr>(&*res)) {
         auto& container = **list;
 
         auto start_opt = numeric_cast<std::int64_t>(args[2]);
@@ -112,22 +114,10 @@ auto list_commands::range(const arguments& args) -> response
             log::error("LRANGE command executed with key: {}, but invalid start or stop index: {} "
                        "or {}",
                        args[1], args[2], args[3]);
-            return std::make_unique<ErrorResponse>(INVALID_EXPIRY_ERR);
+            return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
         }
 
-        auto start = *start_opt;
-        auto stop = *stop_opt;
-
-        // handle negative indices
-        if (start < 0)
-            start += container.size();
-        if (stop < 0)
-            stop += container.size();
-
-        // adjust out-of-range indices
-        start = std::max(start, static_cast<std::int64_t>(0));
-        stop = std::min(stop, static_cast<std::int64_t>(container.size() - 1));
-
+        auto [start, stop] = normalize_range(*start_opt, *stop_opt, container.size());
         if (start > stop || start >= static_cast<std::int64_t>(container.size())) {
             log::error("LRANGE command executed with key: {}, but start index {} is greater than "
                        "stop index {} or out of range",

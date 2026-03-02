@@ -7,11 +7,11 @@ using namespace xin::base;
 
 namespace xin::redis {
 
-auto set_with_expiry(const arguments& args) -> response
+auto set_with_expiry(const Arguments& args) -> ResponsePtr
 {
     auto expiry = numeric_cast<std::uint64_t>(args[4]);
     if (!expiry)
-        return std::make_unique<ErrorResponse>(INVALID_EXPIRY_ERR);
+        return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
 
     db().set(args[1], std::make_shared<std::string>(args[2]), *expiry);
     log::info("SET command with expiry executed with key: {}, value: {}, expire time: {} seconds",
@@ -19,14 +19,14 @@ auto set_with_expiry(const arguments& args) -> response
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
-auto set_persist(const arguments& args) -> response
+auto set_persist(const Arguments& args) -> ResponsePtr
 {
     db().set(args[1], std::make_shared<std::string>(args[2]));
     log::info("SET command executed with key: {} and value: {}", args[1], args[2]);
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
-auto string_commands::set(const arguments& args) -> response
+auto string_commands::set(const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 3)
         return set_persist(args);
@@ -38,7 +38,7 @@ auto string_commands::set(const arguments& args) -> response
     return std::make_unique<ErrorResponse>(arguments_size_error("set"));
 }
 
-auto string_commands::get(const arguments& args) -> response
+auto string_commands::get(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
         log::error("GET command received wrong number of arguments: {}", args);
@@ -51,7 +51,7 @@ auto string_commands::get(const arguments& args) -> response
         return std::make_unique<NullBulkStringResponse>();
     }
 
-    if (auto* value = std::get_if<string_type>(&*res)) {
+    if (auto* value = std::get_if<StringPtr>(&*res)) {
         log::info("GET command executed with key: {}, value found", args[1]);
         return std::make_unique<SingleBulkStringResponse>(*value);
     }

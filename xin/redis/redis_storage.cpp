@@ -4,7 +4,7 @@
 
 namespace xin::redis {
 
-auto Database::get(const key_type& key) -> std::optional<value_type>
+auto Database::get(const KeyType& key) -> std::optional<ValueType>
 {
     if (erase_if_expired(key))
         return {};
@@ -16,7 +16,7 @@ auto Database::get(const key_type& key) -> std::optional<value_type>
     return {};
 }
 
-auto Database::expire_at(const key_type& key, time_t seconds) -> bool
+auto Database::expire_at(const KeyType& key, Seconds seconds) -> bool
 {
     if (!data_.contains(key))
         return false;
@@ -25,7 +25,7 @@ auto Database::expire_at(const key_type& key, time_t seconds) -> bool
     return true;
 }
 
-auto Database::ttl(const key_type& key) -> std::optional<time_t>
+auto Database::ttl(const KeyType& key) -> std::optional<Seconds>
 {
     if (erase_if_expired(key))
         return {};
@@ -38,7 +38,7 @@ auto Database::ttl(const key_type& key) -> std::optional<time_t>
     return remaining / 1000; // 转换为秒
 }
 
-auto Database::contains(const key_type& key) -> bool
+auto Database::contains(const KeyType& key) -> bool
 {
     if (erase_if_expired(key))
         return false;
@@ -54,13 +54,13 @@ void Database::flush()
 
 void Database::flush_async()
 {
-    data_container old_data;
-    expire_container old_expire_time;
+    Datas old_data;
+    Expires old_expire_time;
     std::swap(old_data, data_);
     std::swap(old_expire_time, expire_time_);
 
     // 在后台线程中清理旧数据
-    auto cleanup_task = [](data_container old_data, expire_container old_expire_time) {
+    auto cleanup_task = [](Datas old_data, Expires old_expire_time) {
         old_data.clear();
         old_expire_time.clear();
     };
@@ -69,16 +69,16 @@ void Database::flush_async()
     t.detach();
 }
 
-auto Database::persist(const key_type& key) -> bool { return expire_time_.erase(key) > 0; }
+auto Database::persist(const KeyType& key) -> bool { return expire_time_.erase(key) > 0; }
 
-auto Database::now() -> time_t
+auto Database::now() -> Seconds
 {
-    auto now = clock::now();
+    auto now = Clock::now();
     auto epoch = now.time_since_epoch();
-    return std::chrono::duration_cast<time_unit>(epoch).count();
+    return std::chrono::duration_cast<TimeUnit>(epoch).count();
 }
 
-auto Database::erase_if_expired(const key_type& key) -> bool
+auto Database::erase_if_expired(const KeyType& key) -> bool
 {
     auto it = expire_time_.find(key);
     if (it != expire_time_.end() && now() >= it->second) {
