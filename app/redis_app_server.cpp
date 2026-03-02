@@ -97,6 +97,8 @@ auto listener(std::uint16_t port) -> awaitable<void>
 int main(int argc, char* argv[])
 {
     constexpr std::uint16_t port = 16379;
+    xin::base::log::set_level(xin::base::LogLevel::Warning);
+
     try {
         asio::io_context ctx(1);
         co_spawn(ctx, listener(port), detached);

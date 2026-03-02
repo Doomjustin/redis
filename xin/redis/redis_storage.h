@@ -4,7 +4,6 @@
 #include <chrono>
 #include <concepts>
 #include <list>
-#include <map>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -12,6 +11,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 
 namespace xin::redis {
 
@@ -136,8 +136,10 @@ public:
     }
 
 private:
-    std::map<key_type, value_type> data_;
-    std::unordered_map<key_type, time_t> expire_time_;
+    using data_container = std::unordered_map<key_type, value_type>;
+    using expire_container = std::unordered_map<key_type, time_t>;
+    data_container data_;
+    expire_container expire_time_;
 
     static auto now() -> time_t;
 

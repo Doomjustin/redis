@@ -74,6 +74,7 @@
         "iosfwd",
         "lpush",
         "LPUSH",
+        "lrange",
         "MGET",
         "mqueue",
         "netdb",

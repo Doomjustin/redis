@@ -54,14 +54,13 @@ void Database::flush()
 
 void Database::flush_async()
 {
-    std::map<key_type, value_type> old_data;
-    std::unordered_map<key_type, time_t> old_expire_time;
+    data_container old_data;
+    expire_container old_expire_time;
     std::swap(old_data, data_);
     std::swap(old_expire_time, expire_time_);
 
     // 在后台线程中清理旧数据
-    auto cleanup_task = [](std::map<key_type, value_type> old_data,
-                           std::unordered_map<key_type, time_t> old_expire_time) {
+    auto cleanup_task = [](data_container old_data, expire_container old_expire_time) {
         old_data.clear();
         old_expire_time.clear();
     };
