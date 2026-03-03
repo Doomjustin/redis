@@ -10,7 +10,6 @@
 #include <redis_response.h>
 #include <redis_serialization_protocl.h>
 
-#include <algorithm>
 #include <array>
 #include <cstdlib>
 
@@ -21,19 +20,59 @@ using asio::use_awaitable;
 using asio::ip::tcp;
 
 using xin::base::log;
+using xin::redis::commands;
+using xin::redis::Response;
 using xin::redis::RESPParser;
 using arguments = RESPParser::arguments;
 
-auto echo_session(tcp::socket socket) -> awaitable<void>
-{
-    using namespace xin::redis;
-    try {
-        constexpr std::size_t buffer_size = 8192;
+class Server {
+public:
+    using PortType = std::uint16_t;
+    Server(PortType port, int thead_count = 1)
+        : port_{ port }
+        , context_{ thead_count }
+    {
+    }
 
+    // 阻塞调用，直到服务器停止
+    void start()
+    {
+        try {
+            co_spawn(context_, listener(port_), detached);
+            context_.run();
+        }
+        catch (const std::exception& e) {
+            log::error("Server error: {}", e.what());
+        }
+    }
+
+private:
+    static constexpr std::size_t buffer_size = 8192;
+
+    PortType port_;
+    std::unique_ptr<tcp::acceptor> acceptor_;
+    asio::io_context context_;
+
+    auto listener(std::uint16_t port) -> awaitable<void>
+    {
+        acceptor_ = std::make_unique<tcp::acceptor>(co_await asio::this_coro::executor,
+                                                    tcp::endpoint(tcp::v4(), port_));
+        log::info("Listening on port {}", port);
+
+        while (true) {
+            auto socket = co_await acceptor_->async_accept(use_awaitable);
+            // 启动一个新的协程处理这个连接，detached
+            // 表示我们不关心这个协程什么时候结束（它自己会管自己）
+            co_spawn(acceptor_->get_executor(), echo_session(std::move(socket)), detached);
+        }
+    }
+
+    auto dispatch_command(tcp::socket socket) -> awaitable<void>
+    {
         std::array<char, buffer_size> buffer{};
-        RESPParser parser{};
         std::size_t write_idx = 0;
-        std::vector<ResponsePtr> responses{};
+        RESPParser parser{};
+        std::vector<std::unique_ptr<Response>> responses{};
 
         while (true) {
             auto socket_buffer = asio::buffer(buffer.data() + write_idx, buffer.size() - write_idx);
@@ -42,14 +81,11 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
             auto total_len = write_idx + n;
             std::span<const char> buffer_view{ buffer.data(), total_len };
 
-            bool has_parsed_command = false;
-            // 解析 RESP 协议
             while (true) {
                 auto res = parser.parse(buffer_view);
 
                 if (res) {
-                    log::info("Command: {}", res->at(0));
-                    has_parsed_command = true;
+                    log::debug("Command: {}", res->at(0));
 
                     auto response = commands::dispatch(*res);
                     responses.push_back(std::move(response));
@@ -68,13 +104,14 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
                     else {
                         write_idx = 0;
                     }
+                    break;
                 }
                 else {
                     co_return;
                 }
             }
 
-            if (has_parsed_command && !responses.empty()) {
+            if (!responses.empty()) {
                 std::vector<asio::const_buffer> response_buffers{};
                 for (const auto& res : responses) {
                     auto buffers = res->to_buffer();
@@ -86,39 +123,32 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
             }
         }
     }
-    catch (const asio::system_error& e) {
-        if (e.code() == asio::error::eof)
-            log::info("Client disconnected");
-        else
-            log::error("Session error: {}", e.what());
-    }
-    catch (const std::exception& e) {
-        log::error("Exception in Session: {}", e.what());
-    }
-}
 
-auto listener(std::uint16_t port) -> awaitable<void>
-{
-    tcp::acceptor acceptor(co_await asio::this_coro::executor, tcp::endpoint(tcp::v4(), port));
-    log::info("Listening on port {}", port);
-
-    while (true) {
-        auto socket = co_await acceptor.async_accept(use_awaitable);
-        // 启动一个新的协程处理这个连接，detached
-        // 表示我们不关心这个协程什么时候结束（它自己会管自己）
-        co_spawn(acceptor.get_executor(), echo_session(std::move(socket)), detached);
+    auto echo_session(tcp::socket socket) -> awaitable<void>
+    {
+        try {
+            co_await dispatch_command(std::move(socket));
+        }
+        catch (const asio::system_error& e) {
+            if (e.code() == asio::error::eof)
+                log::info("Client disconnected");
+            else
+                log::error("Session error: {}", e.what());
+        }
+        catch (const std::exception& e) {
+            log::error("Exception in Session: {}", e.what());
+        }
     }
-}
+};
 
 int main(int argc, char* argv[])
 {
     constexpr std::uint16_t port = 16379;
     xin::base::log::set_level(xin::base::LogLevel::Warning);
+    Server server{ port };
 
     try {
-        asio::io_context ctx(1);
-        co_spawn(ctx, listener(port), detached);
-        ctx.run();
+        server.start();
     }
     catch (const std::exception& e) {
         log::error("Server error: {}", e.what());

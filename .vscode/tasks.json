@@ -1,0 +1,37 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Scaffold: C++ .h/.cpp/.test.cpp",
+            "type": "shell",
+            "command": "zsh",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "args": [
+                "-lc",
+                "set -euo pipefail\nname=\"${input:fileBase}\"\ndir_input=\"${input:targetDir}\"\nworkspace=\"${workspaceFolder}\"\nns=\"${input:namespace}\"\n\nif [[ -z \"$name\" ]]; then\n  echo \"文件名不能为空\"\n  exit 1\nfi\n\nif [[ ! \"$name\" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then\n  echo \"文件名仅支持字母/数字/下划线，且必须以字母开头\"\n  exit 1\nfi\n\nif [[ -z \"$dir_input\" ]]; then\n  dir=\"$workspace\"\nelif [[ \"$dir_input\" == /* ]]; then\n  dir=\"$dir_input\"\nelse\n  dir=\"$workspace/$dir_input\"\nfi\n\ndir=$(realpath -m \"$dir\")\nworkspace=$(realpath -m \"$workspace\")\nmkdir -p \"$dir\"\n\nrel_dir=\"$dir\"\nif [[ \"$dir\" == \"$workspace\"/* ]]; then\n  rel_dir=\"${dir#$workspace/}\"\nfi\n\nif [[ -z \"$ns\" ]]; then\n  if [[ \"$rel_dir\" == xin/* ]]; then\n    ns=\"${rel_dir//\//::}\"\n  else\n    ns=\"xin\"\n  fi\nfi\n\nh=\"$dir/$name.h\"\ncpp=\"$dir/$name.cpp\"\ntest=\"$dir/$name.test.cpp\"\n\nfor f in \"$h\" \"$cpp\" \"$test\"; do\n  if [[ -e \"$f\" ]]; then\n    echo \"文件已存在: $f\"\n    echo \"未覆盖已有文件，请换名后重试\"\n    exit 2\n  fi\ndone\n\nguard_name=$(echo \"$name\" | tr \"[:lower:]\" \"[:upper:]\")\nguard=\"XIN_${guard_name}_H\"\n\ncat > \"$h\" <<EOF\n#ifndef $guard\n#define $guard\n\nnamespace $ns {\n\n} // namespace $ns\n\n#endif // $guard\nEOF\n\ncat > \"$cpp\" <<EOF\n#include \"$name.h\"\n\nnamespace $ns {\n\n} // namespace $ns\nEOF\n\ncat > \"$test\" <<EOF\n#include \"$name.h\"\n\n#include <doctest/doctest.h>\nEOF\n\necho \"已生成文件:\"\necho \"- $h\"\necho \"- $cpp\"\necho \"- $test\""
+            ],
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "fileBase",
+            "type": "promptString",
+            "description": "输入文件基名（例如 redis_bitmap）"
+        },
+        {
+            "id": "targetDir",
+            "type": "promptString",
+            "description": "输入生成目录（支持绝对路径；相对路径将基于当前项目根目录）",
+            "default": "${workspaceFolder}/xin/redis"
+        },
+        {
+            "id": "namespace",
+            "type": "promptString",
+            "description": "输入命名空间",
+            "default": "xin::redis"
+        }
+    ]
+}
