@@ -64,11 +64,11 @@ TEST_SUITE("redis-command-list")
     TEST_CASE("list command argument and wrongtype errors")
     {
         CHECK(response_to_string(list_commands::push(Arguments{ "LPUSH", "k_only" })) ==
-              "-ERR wrong number of Arguments for 'lpush' command\r\n");
+              "-ERR wrong number of arguments for 'lpush' command\r\n");
         CHECK(response_to_string(list_commands::pop(Arguments{ "LPOP" })) ==
-              "-ERR wrong number of Arguments for 'lpop' command\r\n");
+              "-ERR wrong number of arguments for 'lpop' command\r\n");
         CHECK(response_to_string(list_commands::range(Arguments{ "LRANGE", "k", "0" })) ==
-              "-ERR wrong number of Arguments for 'lrange' command\r\n");
+              "-ERR wrong number of arguments for 'lrange' command\r\n");
 
         db().flush();
         CHECK(response_to_string(string_commands::set(

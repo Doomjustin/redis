@@ -70,11 +70,11 @@ TEST_SUITE("redis-command-hash")
     TEST_CASE("hash argument and wrongtype errors")
     {
         CHECK(response_to_string(hash_table_commands::set(Arguments{ "HSET", "k", "f" })) ==
-              "-ERR wrong number of Arguments for 'hset' command\r\n");
+              "-ERR wrong number of arguments for 'hset' command\r\n");
         CHECK(response_to_string(hash_table_commands::get(Arguments{ "HGET", "k" })) ==
-              "-ERR wrong number of Arguments for 'hget' command\r\n");
+              "-ERR wrong number of arguments for 'hget' command\r\n");
         CHECK(response_to_string(hash_table_commands::get_all(Arguments{ "HGETALL", "k", "x" })) ==
-              "-ERR wrong number of Arguments for 'hgetall' command\r\n");
+              "-ERR wrong number of arguments for 'hgetall' command\r\n");
 
         db().flush();
         CHECK(response_to_string(string_commands::set(

@@ -35,7 +35,7 @@ TEST_SUITE("redis-command-common")
     TEST_CASE("ping with invalid arity returns error")
     {
         CHECK(response_to_string(common_commands::ping(Arguments{ "PING", "a", "b" })) ==
-              "-ERR wrong number of Arguments for 'ping' command\r\n");
+              "-ERR wrong number of arguments for 'ping' command\r\n");
     }
 
     TEST_CASE("mget returns values and nil for missing keys")

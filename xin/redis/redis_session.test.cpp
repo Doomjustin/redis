@@ -1,0 +1,51 @@
+#include "redis_session.h"
+
+#include <asio.hpp>
+#include <doctest/doctest.h>
+
+#include <array>
+#include <thread>
+
+using asio::ip::tcp;
+
+TEST_SUITE("redis-session")
+{
+    TEST_CASE("session handles ping command")
+    {
+        asio::io_context context{ 1 };
+        tcp::acceptor acceptor{ context, tcp::endpoint(tcp::v4(), 0) };
+
+        auto endpoint =
+            tcp::endpoint(asio::ip::address_v4::loopback(), acceptor.local_endpoint().port());
+
+        tcp::socket client{ context };
+        client.connect(endpoint);
+        tcp::socket server_socket = acceptor.accept();
+
+        asio::co_spawn(
+            context,
+            [socket = std::move(server_socket)]() mutable -> asio::awaitable<void> {
+                xin::redis::Session session{ std::move(socket) };
+
+                try {
+                    co_await session.start();
+                }
+                catch (...) {
+                }
+            },
+            asio::detached);
+
+        std::thread io_thread{ [&context]() { context.run(); } };
+
+        constexpr std::string_view ping = "*1\r\n$4\r\nPING\r\n";
+        asio::write(client, asio::buffer(ping.data(), ping.size()));
+
+        std::array<char, 7> response{};
+        asio::read(client, asio::buffer(response));
+        CHECK(std::string{ response.data(), response.size() } == "+PONG\r\n");
+
+        client.close();
+        context.stop();
+        io_thread.join();
+    }
+}

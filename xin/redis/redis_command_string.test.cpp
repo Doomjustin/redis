@@ -52,9 +52,9 @@ TEST_SUITE("redis-command-string")
     TEST_CASE("set and get argument validation")
     {
         CHECK(response_to_string(string_commands::set(Arguments{ "SET", "k_only" })) ==
-              "-ERR wrong number of Arguments for 'set' command\r\n");
+              "-ERR wrong number of arguments for 'set' command\r\n");
         CHECK(response_to_string(string_commands::get(Arguments{ "GET" })) ==
-              "-ERR wrong number of Arguments for 'get' command\r\n");
+              "-ERR wrong number of arguments for 'get' command\r\n");
         CHECK(response_to_string(
                   string_commands::set(Arguments{ "SET", "k", "v", "EX", "not_int" })) ==
               "-ERR value is not an integer or out of range\r\n");

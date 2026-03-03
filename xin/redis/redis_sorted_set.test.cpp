@@ -32,24 +32,24 @@ TEST_SUITE("redis-sorted-set")
         CHECK(it->score == doctest::Approx(2.0));
     }
 
-    TEST_CASE("insert_or_assign updates score and returns false for existing member")
+    TEST_CASE("insert_or_assign with different shared_ptr of same text counts as new")
     {
         SortedSet set;
 
         CHECK(set.insert_or_assign(1.0, std::make_shared<std::string>("one")));
-        CHECK_FALSE(set.insert_or_assign(2.0, std::make_shared<std::string>("one")));
+        CHECK(set.insert_or_assign(2.0, std::make_shared<std::string>("one")));
 
-        REQUIRE(set.size() == 1);
-        CHECK(set.begin()->score == doctest::Approx(2.0));
+        REQUIRE(set.size() == 2);
+        CHECK(set.begin()->score == doctest::Approx(1.0));
         CHECK(*set.begin()->member == "one");
     }
 
-    TEST_CASE("insert_or_assign with same score and same member returns false")
+    TEST_CASE("insert_or_assign with same text and same score keeps single entry")
     {
         SortedSet set;
 
         CHECK(set.insert_or_assign(1.0, std::make_shared<std::string>("one")));
-        CHECK_FALSE(set.insert_or_assign(1.0, std::make_shared<std::string>("one")));
+        CHECK(set.insert_or_assign(1.0, std::make_shared<std::string>("one")));
         CHECK(set.size() == 1);
     }
 }
