@@ -35,8 +35,8 @@ auto create_new_sorted_set(const Arguments& args) -> ResponsePtr
 
     db().set(args[1], std::move(sorted_set));
 
-    log::info("ZADD command executed with key: {}, created new sorted set, added {} new elements",
-              args[1], new_elements);
+    log::debug("ZADD command executed with key: {}, created new sorted set, added {} new elements",
+               args[1], new_elements);
 
     return std::make_unique<IntegralResponse>(new_elements);
 }
@@ -55,9 +55,9 @@ auto add_to_existing_sorted_set(const Arguments& args, SortedSet& sorted_set) ->
             ++new_elements;
     }
 
-    log::info("ZADD command executed with key: {}, updated existing sorted set, added {} new "
-              "elements",
-              args[1], new_elements);
+    log::debug("ZADD command executed with key: {}, updated existing sorted set, added {} new "
+               "elements",
+               args[1], new_elements);
 
     return std::make_unique<IntegralResponse>(new_elements);
 }
@@ -76,8 +76,8 @@ auto range(const Arguments& args, bool with_scores) -> ResponsePtr
         auto start_opt = numeric_cast<std::int64_t>(args[2]);
         auto stop_opt = numeric_cast<std::int64_t>(args[3]);
         if (!start_opt || !stop_opt) {
-            log::error("ZRANGE command received invalid start or stop index: {}, {}", args[2],
-                       args[3]);
+            log::info("ZRANGE command received invalid start or stop index: {}, {}", args[2],
+                      args[3]);
             return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
         }
 
@@ -88,8 +88,8 @@ auto range(const Arguments& args, bool with_scores) -> ResponsePtr
         auto response = std::make_unique<ArrayResponse>();
         for (auto it = std::next(container.begin(), start);
              it != std::next(container.begin(), stop + 1); ++it) {
-            log::info("ZRANGE command executed with key: {}, returned member: {}", args[1],
-                      *it->member);
+            log::debug("ZRANGE command executed with key: {}, returned member: {}", args[1],
+                       *it->member);
 
             response->add_record(it->member);
 
@@ -97,15 +97,14 @@ auto range(const Arguments& args, bool with_scores) -> ResponsePtr
                 response->add_record(std::make_shared<std::string>(xformat("{:17g}", it->score)));
         }
 
-        log::info("ZRANGE command executed with key: {}, total {} members returned", args[1],
-                  response->size());
+        log::debug("ZRANGE command executed with key: {}, total {} members returned", args[1],
+                   response->size());
         return response;
     }
 
-    log::error(
-        "ZRANGE command executed with key: {}, but WRONGTYPE Operation against a key holding "
-        "the wrong kind of value",
-        args[1]);
+    log::info("ZRANGE command executed with key: {}, but WRONGTYPE Operation against a key holding "
+              "the wrong kind of value",
+              args[1]);
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
@@ -131,16 +130,16 @@ auto sorted_set_commands::add(const Arguments& args) -> ResponsePtr
     if (auto* sorted_set = std::get_if<SortedSetPtr>(&*res))
         return add_to_existing_sorted_set(args, **sorted_set);
 
-    log::error("ZADD command executed with key: {}, but WRONGTYPE Operation against a key holding "
-               "the wrong kind of value",
-               args[1]);
+    log::info("ZADD command executed with key: {}, but WRONGTYPE Operation against a key holding "
+              "the wrong kind of value",
+              args[1]);
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
 auto sorted_set_commands::range(const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 5 && strings::to_lowercase(args[4]) != "withscores") {
-        log::error("ZRANGE command received invalid option: {}", args[4]);
+        log::info("ZRANGE command received invalid option: {}", args[4]);
         return std::make_unique<ErrorResponse>("ERR syntax error");
     }
 

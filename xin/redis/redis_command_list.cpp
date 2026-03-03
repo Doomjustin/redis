@@ -12,8 +12,8 @@ using namespace xin::redis;
 
 auto create_new_list(const Arguments& args) -> ResponsePtr
 {
-    log::info("LPUSH command executed with key: {}, but key does not exist, creating new list",
-              args[1]);
+    log::debug("LPUSH command executed with key: {}, but key does not exist, creating new list",
+               args[1]);
 
     auto list = std::make_shared<ListPtr::element_type>();
     for (size_t i = 2; i < args.size(); ++i)
@@ -29,8 +29,8 @@ auto add_to_existing_list(const Arguments& args, ListType& container) -> Respons
     for (size_t i = 2; i < args.size(); ++i)
         container.push_front(std::make_shared<std::string>(args[i]));
 
-    log::info("LPUSH command executed with key: {}, added {} elements to existing list", args[1],
-              args.size() - 2);
+    log::debug("LPUSH command executed with key: {}, added {} elements to existing list", args[1],
+               args.size() - 2);
     return std::make_unique<IntegralResponse>(container.size());
 }
 
@@ -41,7 +41,7 @@ namespace xin::redis {
 auto list_commands::push(const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 3) {
-        log::error("LPUSH command received wrong number of arguments: {}", args);
+        log::info("LPUSH command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("lpush"));
     }
 
@@ -52,16 +52,16 @@ auto list_commands::push(const Arguments& args) -> ResponsePtr
     if (auto* list = std::get_if<ListPtr>(&*res))
         return add_to_existing_list(args, **list);
 
-    log::error("LPUSH command executed with key: {}, but WRONGTYPE Operation against a "
-               "key holding the wrong kind of value",
-               args[1]);
+    log::info("LPUSH command executed with key: {}, but WRONGTYPE Operation against a "
+              "key holding the wrong kind of value",
+              args[1]);
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
 auto list_commands::pop(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
-        log::error("LPOP command received wrong number of arguments: {}", args);
+        log::info("LPOP command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("lpop"));
     }
 
@@ -82,20 +82,20 @@ auto list_commands::pop(const Arguments& args) -> ResponsePtr
         auto value = container.front();
         container.pop_front();
 
-        log::info("LPOP command executed with key: {}, popped value: {}", args[1], *value);
+        log::debug("LPOP command executed with key: {}, popped value: {}", args[1], *value);
         return std::make_unique<SingleBulkStringResponse>(value);
     }
 
-    log::error("LPOP command executed with key: {}, but WRONGTYPE Operation against a "
-               "key holding the wrong kind of value",
-               args[1]);
+    log::info("LPOP command executed with key: {}, but WRONGTYPE Operation against a "
+              "key holding the wrong kind of value",
+              args[1]);
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
 auto list_commands::range(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 4) {
-        log::error("LRANGE command received wrong number of arguments: {}", args);
+        log::info("LRANGE command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("lrange"));
     }
 
@@ -111,17 +111,17 @@ auto list_commands::range(const Arguments& args) -> ResponsePtr
         auto start_opt = numeric_cast<std::int64_t>(args[2]);
         auto stop_opt = numeric_cast<std::int64_t>(args[3]);
         if (!start_opt || !stop_opt) {
-            log::error("LRANGE command executed with key: {}, but invalid start or stop index: {} "
-                       "or {}",
-                       args[1], args[2], args[3]);
+            log::info("LRANGE command executed with key: {}, but invalid start or stop index: {} "
+                      "or {}",
+                      args[1], args[2], args[3]);
             return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
         }
 
         auto [start, stop] = normalize_range(*start_opt, *stop_opt, container.size());
         if (start > stop || start >= static_cast<std::int64_t>(container.size())) {
-            log::error("LRANGE command executed with key: {}, but start index {} is greater than "
-                       "stop index {} or out of range",
-                       args[1], start, stop);
+            log::info("LRANGE command executed with key: {}, but start index {} is greater than "
+                      "stop index {} or out of range",
+                      args[1], start, stop);
             return std::make_unique<ArrayResponse>();
         }
 
@@ -129,8 +129,8 @@ auto list_commands::range(const Arguments& args) -> ResponsePtr
         for (auto beg = std::next(container.begin(), start),
                   end = std::next(container.begin(), stop + 1);
              beg != end; ++beg) {
-            log::info("LRANGE command executed with key: {}, index: {}, value: {}", args[1],
-                      std::distance(container.begin(), beg), **beg);
+            log::debug("LRANGE command executed with key: {}, index: {}, value: {}", args[1],
+                       std::distance(container.begin(), beg), **beg);
             response->add_record(*beg);
         }
 
@@ -139,9 +139,9 @@ auto list_commands::range(const Arguments& args) -> ResponsePtr
         return response;
     }
 
-    log::error("LRANGE command executed with key: {}, but WRONGTYPE Operation against a "
-               "key holding the wrong kind of value",
-               args[1]);
+    log::info("LRANGE command executed with key: {}, but WRONGTYPE Operation against a "
+              "key holding the wrong kind of value",
+              args[1]);
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 

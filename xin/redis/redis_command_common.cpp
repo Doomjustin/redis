@@ -10,47 +10,47 @@ namespace xin::redis {
 auto common_commands::ping(const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 1) {
-        log::info("PING command executed with no arguments, responding with PONG");
+        log::debug("PING command executed with no arguments, responding with PONG");
         return std::make_unique<SimpleStringResponse>("PONG");
     }
 
     if (args.size() == 2) {
-        log::info("PING command executed with argument: {}, responding with {}", args[1], args[1]);
+        log::debug("PING command executed with argument: {}, responding with {}", args[1], args[1]);
         return std::make_unique<SimpleStringResponse>(args[1]);
     }
 
-    log::error("PING command received wrong number of arguments: {}, expected 0 or 1", args);
+    log::info("PING command received wrong number of arguments: {}, expected 0 or 1", args);
     return std::make_unique<ErrorResponse>(arguments_size_error("ping"));
 }
 
 auto common_commands::keys(const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 2) {
-        log::error("KEYS command received wrong number of arguments: {}", args);
+        log::info("KEYS command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("keys"));
     }
 
     auto pattern = std::span{ args.begin() + 1, args.end() };
-    log::info("KEYS command executed with pattern: {}", pattern);
+    log::debug("KEYS command executed with pattern: {}", pattern);
     auto res = db().keys(pattern);
 
     ArrayResponse response{};
     for (auto& item : res)
         response.add_record(std::make_shared<std::string>(item));
 
-    log::info("KEYS command executed with pattern: {}, found {} keys", pattern, res.size());
+    log::debug("KEYS command executed with pattern: {}, found {} keys", pattern, res.size());
     return std::make_unique<ArrayResponse>(std::move(response));
 }
 
 auto common_commands::mget(const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 2) {
-        log::error("MGET command received wrong number of arguments: {}", args);
+        log::info("MGET command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("mget"));
     }
 
     auto keys = std::span{ args.begin() + 1, args.end() };
-    log::info("MGET command executed with keys: {}", keys);
+    log::debug("MGET command executed with keys: {}", keys);
     auto res = db().mget(keys);
 
     int found_count = 0;
@@ -61,21 +61,21 @@ auto common_commands::mget(const Arguments& args) -> ResponsePtr
         response.add_record(item);
     }
 
-    log::info("MGET command executed with keys: {}, found {} values", keys, found_count);
+    log::debug("MGET command executed with keys: {}, found {} values", keys, found_count);
     return std::make_unique<ArrayResponse>(std::move(response));
 }
 
 auto flushdb_async(const Arguments& args) -> ResponsePtr
 {
     db().flush_async();
-    log::info("FLUSHdb() ASYNC command executed, database clearing initiated in background");
+    log::debug("FLUSHdb() ASYNC command executed, database clearing initiated in background");
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
 auto flushdb_sync(const Arguments& args) -> ResponsePtr
 {
     db().flush();
-    log::info("FLUSHdb() SYNC command executed, database cleared");
+    log::debug("FLUSHdb() SYNC command executed, database cleared");
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
@@ -90,26 +90,26 @@ auto common_commands::flushdb(const Arguments& args) -> ResponsePtr
     if (args.size() == 2 && strings::to_lowercase(args[1]) == "sync")
         return flushdb_sync(args);
 
-    log::error("FLUSHdb() command received wrong number of arguments or invalid option: {}", args);
+    log::info("FLUSHdb() command received wrong number of arguments or invalid option: {}", args);
     return std::make_unique<ErrorResponse>(arguments_size_error("flushdb()"));
 }
 
 auto common_commands::dbsize(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 1) {
-        log::error("dbsize command received wrong number of arguments: {}", args);
+        log::info("dbsize command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("dbsize"));
     }
 
     auto size = db().size();
-    log::info("dbsize command executed, database size: {}", size);
+    log::debug("dbsize command executed, database size: {}", size);
     return std::make_unique<IntegralResponse>(size);
 }
 
 auto common_commands::expire(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 3) {
-        log::error("EXPIRE command received wrong number of arguments: {}", args);
+        log::info("EXPIRE command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("expire"));
     }
 
@@ -119,8 +119,8 @@ auto common_commands::expire(const Arguments& args) -> ResponsePtr
 
     auto key = args[1];
     bool success = db().expire_at(key, *seconds);
-    log::info("EXPIRE command executed for key: {}, expire time: {} seconds, success: {}", key,
-              *seconds, success);
+    log::debug("EXPIRE command executed for key: {}, expire time: {} seconds, success: {}", key,
+               *seconds, success);
     return std::make_unique<IntegralResponse>(success ? 1 : 0);
 }
 
@@ -130,7 +130,7 @@ auto common_commands::ttl(const Arguments& args) -> ResponsePtr
     constexpr int key_no_expire = -1;
 
     if (args.size() != 2) {
-        log::error("TTL command received wrong number of arguments: {}", args);
+        log::info("TTL command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("ttl"));
     }
 
@@ -138,32 +138,32 @@ auto common_commands::ttl(const Arguments& args) -> ResponsePtr
     auto res = db().ttl(key);
     if (!res) {
         if (db().contains(key)) {
-            log::info("TTL command executed for key: {}, but key has no expiration", key);
+            log::debug("TTL command executed for key: {}, but key has no expiration", key);
             return std::make_unique<IntegralResponse>(key_no_expire);
         }
 
-        log::info("TTL command executed for key: {}, but key does not exist", key);
+        log::debug("TTL command executed for key: {}, but key does not exist", key);
         return std::make_unique<IntegralResponse>(key_not_exist);
     }
 
-    log::info("TTL command executed for key: {}, remaining TTL: {} seconds", key, *res);
+    log::debug("TTL command executed for key: {}, remaining TTL: {} seconds", key, *res);
     return std::make_unique<IntegralResponse>(*res);
 }
 
 auto common_commands::persist(const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
-        log::error("PERSIST command received wrong number of arguments: {}", args);
+        log::info("PERSIST command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("persist"));
     }
 
     auto key = args[1];
     if (db().persist(key)) {
-        log::info("PERSIST command executed for key: {}, expiration removed", key);
+        log::debug("PERSIST command executed for key: {}, expiration removed", key);
         return std::make_unique<IntegralResponse>(1);
     }
 
-    log::info("PERSIST command executed for key: {}, but key has no expiration", key);
+    log::debug("PERSIST command executed for key: {}, but key has no expiration", key);
     return std::make_unique<IntegralResponse>(0);
 }
 
