@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 4.0)
 
-project(CppTemplate
+project(XinRedis
     VERSION 0.0.1
     LANGUAGES C CXX
 )
@@ -12,6 +12,8 @@ cmake_dependent_option(${PROJECT_NAME}_BUILD_TESTS
     "Enable ${PROJECT_NAME} project tests targets" ON
     "BUILD_TESTING" OFF
 )
+
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)

@@ -1,3 +1,5 @@
+#include "redis_command_define.h"
+
 #include <asio.hpp>
 #include <asio/awaitable.hpp>
 #include <asio/co_spawn.hpp>
@@ -8,6 +10,7 @@
 #include <redis_response.h>
 #include <redis_serialization_protocl.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 
@@ -25,9 +28,12 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
 {
     using namespace xin::redis;
     try {
-        std::array<char, 1024> buffer{};
+        constexpr std::size_t buffer_size = 8192;
+
+        std::array<char, buffer_size> buffer{};
         RESPParser parser{};
         std::size_t write_idx = 0;
+        std::vector<ResponsePtr> responses{};
 
         while (true) {
             auto socket_buffer = asio::buffer(buffer.data() + write_idx, buffer.size() - write_idx);
@@ -36,18 +42,17 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
             auto total_len = write_idx + n;
             std::span<const char> buffer_view{ buffer.data(), total_len };
 
+            bool has_parsed_command = false;
             // 解析 RESP 协议
             while (true) {
                 auto res = parser.parse(buffer_view);
 
                 if (res) {
                     log::info("Command: {}", res->at(0));
+                    has_parsed_command = true;
 
-                    // WARNING:
-                    // 这个算是一个坑，async_write不能传给他一个临时对象buffer，必须给他一个有效的对象
                     auto response = commands::dispatch(*res);
-                    auto buffers = response->to_buffer();
-                    co_await asio::async_write(socket, buffers, use_awaitable);
+                    responses.push_back(std::move(response));
 
                     parser.reset();
                     if (buffer_view.empty()) {
@@ -67,6 +72,17 @@ auto echo_session(tcp::socket socket) -> awaitable<void>
                 else {
                     co_return;
                 }
+            }
+
+            if (has_parsed_command && !responses.empty()) {
+                std::vector<asio::const_buffer> response_buffers{};
+                for (const auto& res : responses) {
+                    auto buffers = res->to_buffer();
+                    response_buffers.insert(response_buffers.end(), buffers.begin(), buffers.end());
+                }
+
+                co_await asio::async_write(socket, response_buffers, use_awaitable);
+                responses.clear();
             }
         }
     }

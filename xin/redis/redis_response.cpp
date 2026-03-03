@@ -54,19 +54,37 @@ auto IntegralResponse::to_buffer() const -> buffers
 SingleBulkStringResponse::SingleBulkStringResponse(std::shared_ptr<std::string> content)
     : content_{ std::move(content) }
 {
+    if (!content_) {
+        small_content_ = "$-1\r\n";
+        return;
+    }
+
+    if (content_->size() <= 128) {
+        small_content_ = xformat("${}\r\n{}\r\n", content_->size(), *content_);
+        return;
+    }
+
     size_header_ = xformat("${}\r\n", content_->size());
 }
 
 auto SingleBulkStringResponse::to_buffer() const -> buffers
 {
     buffers result{};
+    if (small_content_) {
+        result.emplace_back(small_content_->data(), small_content_->size());
+        return result;
+    }
+
     result.emplace_back(size_header_.data(), size_header_.size());
-    result.emplace_back(content_->data(), content_->size());
-    result.emplace_back(footer.data(), footer.size());
+    if (content_) {
+        result.emplace_back(content_->data(), content_->size());
+        result.emplace_back(footer.data(), footer.size());
+    }
+
     return result;
 }
 
-void BulkStringResponse::add_record(std::shared_ptr<std::string> content)
+void ArrayResponse::add_record(std::shared_ptr<std::string> content)
 {
     if (content)
         content_size_.emplace_back(xformat("${}\r\n", content->size()));
@@ -78,7 +96,7 @@ void BulkStringResponse::add_record(std::shared_ptr<std::string> content)
     header_ = xformat("*{}\r\n", contents_.size());
 }
 
-auto BulkStringResponse::to_buffer() const -> buffers
+auto ArrayResponse::to_buffer() const -> buffers
 {
     buffers result{};
     result.emplace_back(header_.data(), header_.size());

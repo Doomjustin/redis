@@ -46,22 +46,35 @@ TEST_SUITE("redis-response")
         CHECK(buffers_to_string(resp.to_buffer()) == "$5\r\nhello\r\n");
     }
 
+    TEST_CASE("SingleBulkStringResponse 空内容按nil编码")
+    {
+        SingleBulkStringResponse resp{ nullptr };
+        CHECK(buffers_to_string(resp.to_buffer()) == "$-1\r\n");
+    }
+
+    TEST_CASE("SingleBulkStringResponse 大内容按分片编码")
+    {
+        auto payload = std::make_shared<std::string>(129, 'x');
+        SingleBulkStringResponse resp{ payload };
+        CHECK(buffers_to_string(resp.to_buffer()) == "$129\r\n" + *payload + "\r\n");
+    }
+
     TEST_CASE("BulkStringResponse 单记录按数组序列化")
     {
-        BulkStringResponse resp;
+        ArrayResponse resp;
         resp.add_record(std::make_shared<std::string>("hello"));
         CHECK(buffers_to_string(resp.to_buffer()) == "*1\r\n$5\r\nhello\r\n");
     }
 
     TEST_CASE("BulkStringResponse 空记录序列化为空数组")
     {
-        BulkStringResponse resp;
+        ArrayResponse resp;
         CHECK(buffers_to_string(resp.to_buffer()) == "*0\r\n");
     }
 
     TEST_CASE("BulkStringResponse 多记录按标准RESP数组序列化")
     {
-        BulkStringResponse resp;
+        ArrayResponse resp;
         resp.add_record(std::make_shared<std::string>("hello"));
         resp.add_record(std::make_shared<std::string>("world"));
 
@@ -70,7 +83,7 @@ TEST_SUITE("redis-response")
 
     TEST_CASE("BulkStringResponse 包含nil元素时按RESP编码")
     {
-        BulkStringResponse resp;
+        ArrayResponse resp;
         resp.add_record(std::make_shared<std::string>("a"));
         resp.add_record(nullptr);
         resp.add_record(std::make_shared<std::string>("b"));

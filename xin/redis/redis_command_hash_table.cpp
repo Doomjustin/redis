@@ -60,7 +60,7 @@ auto get_from_hash(const Arguments& args, HashType& container) -> ResponsePtr
 
 auto get_all_from_hash(const Arguments& args, HashType& container) -> ResponsePtr
 {
-    auto response = std::make_unique<BulkStringResponse>();
+    auto response = std::make_unique<ArrayResponse>();
     for (const auto& [field, value] : container) {
         log::info("HGETALL command executed with key: {}, field: {}, value: {}", args[1], field,
                   *value);
@@ -136,7 +136,7 @@ auto hash_table_commands::get_all(const Arguments& args) -> ResponsePtr
     auto res = db().get(args[1]);
     if (!res) {
         log::info("HGETALL command executed with key: {}, but key does not exist", args[1]);
-        return std::make_unique<BulkStringResponse>();
+        return std::make_unique<ArrayResponse>();
     }
 
     if (auto* hash = std::get_if<HashPtr>(&*res))

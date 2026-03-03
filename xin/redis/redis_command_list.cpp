@@ -102,7 +102,7 @@ auto list_commands::range(const Arguments& args) -> ResponsePtr
     auto res = db().get(args[1]);
     if (!res) {
         log::info("LRANGE command executed with key: {}, but key does not exist", args[1]);
-        return std::make_unique<BulkStringResponse>();
+        return std::make_unique<ArrayResponse>();
     }
 
     if (auto* list = std::get_if<ListPtr>(&*res)) {
@@ -122,10 +122,10 @@ auto list_commands::range(const Arguments& args) -> ResponsePtr
             log::error("LRANGE command executed with key: {}, but start index {} is greater than "
                        "stop index {} or out of range",
                        args[1], start, stop);
-            return std::make_unique<BulkStringResponse>();
+            return std::make_unique<ArrayResponse>();
         }
 
-        auto response = std::make_unique<BulkStringResponse>();
+        auto response = std::make_unique<ArrayResponse>();
         for (auto beg = std::next(container.begin(), start),
                   end = std::next(container.begin(), stop + 1);
              beg != end; ++beg) {

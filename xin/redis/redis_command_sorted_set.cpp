@@ -67,7 +67,7 @@ auto range(const Arguments& args, bool with_scores) -> ResponsePtr
     auto res = db().get(args[1]);
     if (!res) {
         log::info("ZRANGE command executed with key: {}, but key does not exist", args[1]);
-        return std::make_unique<BulkStringResponse>();
+        return std::make_unique<ArrayResponse>();
     }
 
     if (auto* sorted_set = std::get_if<SortedSetPtr>(&*res)) {
@@ -83,9 +83,9 @@ auto range(const Arguments& args, bool with_scores) -> ResponsePtr
 
         auto [start, stop] = normalize_range(*start_opt, *stop_opt, container.size());
         if (start > stop || start >= static_cast<std::int64_t>(container.size()))
-            return std::make_unique<BulkStringResponse>();
+            return std::make_unique<ArrayResponse>();
 
-        auto response = std::make_unique<BulkStringResponse>();
+        auto response = std::make_unique<ArrayResponse>();
         for (auto it = std::next(container.begin(), start);
              it != std::next(container.begin(), stop + 1); ++it) {
             log::info("ZRANGE command executed with key: {}, returned member: {}", args[1],

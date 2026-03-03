@@ -34,12 +34,12 @@ auto common_commands::keys(const Arguments& args) -> ResponsePtr
     log::info("KEYS command executed with pattern: {}", pattern);
     auto res = db().keys(pattern);
 
-    BulkStringResponse response{};
+    ArrayResponse response{};
     for (auto& item : res)
         response.add_record(std::make_shared<std::string>(item));
 
     log::info("KEYS command executed with pattern: {}, found {} keys", pattern, res.size());
-    return std::make_unique<BulkStringResponse>(std::move(response));
+    return std::make_unique<ArrayResponse>(std::move(response));
 }
 
 auto common_commands::mget(const Arguments& args) -> ResponsePtr
@@ -54,7 +54,7 @@ auto common_commands::mget(const Arguments& args) -> ResponsePtr
     auto res = db().mget(keys);
 
     int found_count = 0;
-    BulkStringResponse response{};
+    ArrayResponse response{};
     for (auto& item : res) {
         if (item)
             ++found_count;
@@ -62,7 +62,7 @@ auto common_commands::mget(const Arguments& args) -> ResponsePtr
     }
 
     log::info("MGET command executed with keys: {}, found {} values", keys, found_count);
-    return std::make_unique<BulkStringResponse>(std::move(response));
+    return std::make_unique<ArrayResponse>(std::move(response));
 }
 
 auto flushdb_async(const Arguments& args) -> ResponsePtr

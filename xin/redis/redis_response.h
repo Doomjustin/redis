@@ -60,9 +60,10 @@ public:
 private:
     std::string size_header_ = "$1\r\n";
     std::shared_ptr<std::string> content_;
+    std::optional<std::string> small_content_;
 };
 
-class BulkStringResponse : public Response {
+class ArrayResponse : public Response {
 public:
     // 通过shared_ptr来避免多次复制字符串内容
     void add_record(std::shared_ptr<std::string> content);
