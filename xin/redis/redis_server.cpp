@@ -2,7 +2,9 @@
 
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
+#include <asio/steady_timer.hpp>
 #include <base_log.h>
+#include <redis_command_define.h>
 #include <redis_session.h>
 
 using xin::base::log;
@@ -20,6 +22,7 @@ void Server::start()
 {
     try {
         co_spawn(context_, listen(), detached);
+        co_spawn(context_, erase_expired_data(), detached);
         context_.run();
     }
     catch (const std::exception& e) {
@@ -49,6 +52,21 @@ auto Server::dispatch(asio::ip::tcp::socket socket) -> asio::awaitable<void>
     }
     catch (const asio::system_error& e) {
         log::error("Session error: {}", e.what());
+    }
+}
+
+auto Server::erase_expired_data() -> asio::awaitable<void>
+{
+    steady_timer timer{ co_await this_coro::executor };
+
+    while (true) {
+        using namespace std::chrono_literals;
+        timer.expires_after(100ms);
+
+        co_await timer.async_wait(use_awaitable);
+        log::debug("Erasing expired keys...");
+        auto erased = db().erase_expired_keys();
+        log::debug("Erased {} expired keys", erased);
     }
 }
 

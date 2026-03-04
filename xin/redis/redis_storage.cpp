@@ -18,10 +18,12 @@ auto Database::get(const KeyType& key) -> std::optional<ValueType>
 
 auto Database::expire_at(const KeyType& key, Seconds seconds) -> bool
 {
-    if (!data_.contains(key))
+    auto data_it = data_.find(key);
+    if (data_it == data_.end())
         return false;
 
-    expire_time_.insert_or_assign(key, now() + seconds * 1000);
+    erase_expire(data_it->first);
+    expires_.insert(std::make_pair(now() + seconds * 1000, std::string_view{ data_it->first }));
     return true;
 }
 
@@ -30,11 +32,11 @@ auto Database::ttl(const KeyType& key) -> std::optional<Seconds>
     if (erase_if_expired(key))
         return {};
 
-    auto it = expire_time_.find(key);
-    if (it == expire_time_.end())
+    auto it = find_expire_time(key);
+    if (it == expires_.end())
         return {};
 
-    auto remaining = it->second > now() ? it->second - now() : 0;
+    auto remaining = it->first > now() ? it->first - now() : 0;
     return remaining / 1000; // 转换为秒
 }
 
@@ -49,7 +51,7 @@ auto Database::contains(const KeyType& key) -> bool
 void Database::flush()
 {
     data_.clear();
-    expire_time_.clear();
+    expires_.clear();
 }
 
 void Database::flush_async()
@@ -57,7 +59,7 @@ void Database::flush_async()
     Datas old_data;
     Expires old_expire_time;
     std::swap(old_data, data_);
-    std::swap(old_expire_time, expire_time_);
+    std::swap(old_expire_time, expires_);
 
     // 在后台线程中清理旧数据
     auto cleanup_task = [](Datas old_data, Expires old_expire_time) {
@@ -69,7 +71,32 @@ void Database::flush_async()
     t.detach();
 }
 
-auto Database::persist(const KeyType& key) -> bool { return expire_time_.erase(key) > 0; }
+auto Database::persist(const KeyType& key) -> bool
+{
+    auto it = find_expire_time(key);
+    if (it != expires_.end()) {
+        expires_.erase(it);
+        return true;
+    }
+
+    return false;
+}
+
+auto Database::erase_expired_keys() -> int
+{
+    int count = 0;
+    auto expiry = now();
+    for (auto it = expires_.begin(); it != expires_.end();) {
+        if (it->first > expiry)
+            return count;
+
+        data_.erase(std::string{ it->second });
+        it = expires_.erase(it);
+        ++count;
+    }
+
+    return count;
+}
 
 auto Database::now() -> Seconds
 {
@@ -80,14 +107,31 @@ auto Database::now() -> Seconds
 
 auto Database::erase_if_expired(const KeyType& key) -> bool
 {
-    auto it = expire_time_.find(key);
-    if (it != expire_time_.end() && now() >= it->second) {
+    auto it = find_expire_time(key);
+    if (it != expires_.end() && now() >= it->first) {
         data_.erase(key);
-        expire_time_.erase(key);
+        expires_.erase(it);
         return true;
     }
 
     return false;
+}
+
+auto Database::find_expire_time(std::string_view key) -> Expires::iterator
+{
+    for (auto it = expires_.begin(); it != expires_.end(); ++it) {
+        if (it->second == key)
+            return it;
+    }
+
+    return expires_.end();
+}
+
+void Database::erase_expire(std::string_view key)
+{
+    auto it = find_expire_time(key);
+    if (it != expires_.end())
+        expires_.erase(it);
 }
 
 } // namespace xin::redis

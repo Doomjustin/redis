@@ -115,6 +115,35 @@ TEST_SUITE("redis-storage")
         CHECK(*remaining <= 2);
     }
 
+    TEST_CASE("Database 同key重复设置过期应以最后一次为准")
+    {
+        Database db;
+        db.set("k1", std::make_shared<std::string>("v1"));
+
+        REQUIRE(db.expire_at("k1", 0));
+        REQUIRE(db.expire_at("k1", 10));
+
+        auto got = db.get_if<string_type>("k1");
+        REQUIRE(got.has_value());
+        CHECK(**got == "v1");
+
+        auto remaining = db.ttl("k1");
+        REQUIRE(remaining.has_value());
+        CHECK(*remaining <= 10);
+    }
+
+    TEST_CASE("Database 覆盖写入应清除旧过期信息")
+    {
+        Database db;
+        db.set("k1", std::make_shared<std::string>("v1"), 0);
+        db.set("k1", std::make_shared<std::string>("v2"));
+
+        auto got = db.get_if<string_type>("k1");
+        REQUIRE(got.has_value());
+        CHECK(**got == "v2");
+        CHECK_FALSE(db.ttl("k1").has_value());
+    }
+
     TEST_CASE("Database erase 对已过期key不计入删除数量")
     {
         Database db;

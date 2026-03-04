@@ -35,6 +35,8 @@ private:
     auto listen() -> asio::awaitable<void>;
 
     static auto dispatch(asio::ip::tcp::socket socket) -> asio::awaitable<void>;
+
+    static auto erase_expired_data() -> asio::awaitable<void>;
 };
 
 } // namespace xin::redis

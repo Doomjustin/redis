@@ -9,7 +9,9 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <variant>
@@ -41,8 +43,7 @@ public:
         requires is_valid_value<Value>
     void set(const KeyType& key, Value value)
     {
-        if (expire_time_.contains(key))
-            expire_time_.erase(key);
+        erase_expire(key);
 
         data_.insert_or_assign(key, std::move(value));
     }
@@ -51,8 +52,11 @@ public:
         requires is_valid_value<Value>
     void set(const KeyType& key, Value value, Seconds expire_seconds)
     {
-        expire_time_.insert_or_assign(key, now() + expire_seconds * 1000);
-        data_.insert_or_assign(key, std::move(value));
+        erase_expire(key);
+        auto [it, _] = data_.insert_or_assign(key, std::move(value));
+
+        expires_.insert(
+            std::make_pair(now() + expire_seconds * 1000, std::string_view{ it->first }));
     }
 
     template<typename Value>
@@ -112,8 +116,8 @@ public:
 
             auto it = data_.find(key);
             if (it != data_.end()) {
+                erase_expire(key);
                 data_.erase(it);
-                expire_time_.erase(key);
                 ++count;
             }
         }
@@ -132,6 +136,8 @@ public:
 
     auto persist(const KeyType& key) -> bool;
 
+    auto erase_expired_keys() -> int;
+
     [[nodiscard]]
     constexpr auto size() const noexcept -> SizeType
     {
@@ -142,14 +148,18 @@ private:
     using Clock = std::chrono::steady_clock;
     using TimeUnit = std::chrono::milliseconds;
     using Datas = std::unordered_map<KeyType, ValueType>;
-    using Expires = std::unordered_map<KeyType, Seconds>;
+    using Expires = std::set<std::pair<Seconds, std::string_view>>;
 
     Datas data_;
-    Expires expire_time_;
+    Expires expires_;
 
     static auto now() -> Seconds;
 
     auto erase_if_expired(const KeyType& key) -> bool;
+
+    auto find_expire_time(std::string_view key) -> Expires::iterator;
+
+    void erase_expire(std::string_view key);
 };
 
 } // namespace xin::redis
