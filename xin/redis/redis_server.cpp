@@ -51,7 +51,10 @@ auto Server::dispatch(asio::ip::tcp::socket socket) -> asio::awaitable<void>
         co_await session.start();
     }
     catch (const asio::system_error& e) {
-        log::error("Session error: {}", e.what());
+        if (e.code() != asio::error::operation_aborted)
+            log::error("Session error: {}", e.what());
+        else
+            log::debug("Session ended: {}", e.what());
     }
 }
 

@@ -11,6 +11,7 @@ class SortedSet {
 public:
     using Score = double;
     using Member = std::shared_ptr<std::string>;
+
     struct Data {
         Score score;
         Member member;
@@ -45,7 +46,18 @@ public:
     }
 
 private:
-    std::unordered_map<Member, Score> members_dict_;
+    struct MemberHash {
+        auto operator()(const Member& member) const -> std::size_t
+        {
+            return std::hash<std::string>{}(*member);
+        }
+    };
+
+    struct MemberEqual {
+        auto operator()(const Member& lhs, const Member& rhs) const -> bool { return *lhs == *rhs; }
+    };
+
+    std::unordered_map<Member, Score, MemberHash, MemberEqual> members_dict_;
     std::set<Data> scores_tree_;
 };
 

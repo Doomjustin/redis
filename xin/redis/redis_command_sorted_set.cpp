@@ -94,7 +94,7 @@ auto range(const Arguments& args, bool with_scores) -> ResponsePtr
             response->add_record(it->member);
 
             if (with_scores)
-                response->add_record(std::make_shared<std::string>(xformat("{:17g}", it->score)));
+                response->add_record(std::make_shared<std::string>(xformat("{:.17g}", it->score)));
         }
 
         log::debug("ZRANGE command executed with key: {}, total {} members returned", args[1],

@@ -70,12 +70,13 @@ TEST_SUITE("redis-command-sorted-set")
         CHECK(response_to_string(sorted_set_commands::add(
                   Arguments{ "ZADD", "__zset_k4__", "1", "one" })) == ":1\r\n");
         CHECK(response_to_string(sorted_set_commands::add(
-                  Arguments{ "ZADD", "__zset_k4__", "2", "one" })) == ":1\r\n");
+                  Arguments{ "ZADD", "__zset_k4__", "2", "one" })) == ":0\r\n");
 
         auto res = response_to_string(sorted_set_commands::range(
             Arguments{ "ZRANGE", "__zset_k4__", "0", "-1", "WITHSCORES" }));
-        CHECK(res.find("*4\r\n") == 0);
+        CHECK(res.find("*2\r\n") == 0);
         CHECK(res.find("$3\r\none\r\n") != std::string::npos);
+        CHECK(res.find("$1\r\n2\r\n") != std::string::npos);
     }
 
     TEST_CASE("zset argument and wrongtype errors")
