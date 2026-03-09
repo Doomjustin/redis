@@ -18,9 +18,6 @@ using HashPtr = Database::HashPtr;
 using ListType = Database::ListType;
 using ListPtr = Database::ListPtr;
 
-// 尚未实现的命令占位符定义
-auto db(int index = 0) -> Database&;
-
 static constexpr std::string_view WRONG_TYPE_ERR =
     "WRONGTYPE Operation against a key holding the wrong kind of value";
 

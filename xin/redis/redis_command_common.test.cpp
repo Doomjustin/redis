@@ -1,6 +1,7 @@
 #include "redis_command_common.h"
 
 #include <doctest/doctest.h>
+#include <redis_application_context.h>
 #include <redis_command_string.h>
 
 #include <string>
@@ -20,9 +21,9 @@ auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
 
 TEST_SUITE("redis-command-common")
 {
+    using xin::redis::application_context;
     using xin::redis::Arguments;
     using xin::redis::common_commands;
-    using xin::redis::db;
     using xin::redis::string_commands;
 
     TEST_CASE("ping returns pong or echo")
@@ -40,7 +41,7 @@ TEST_SUITE("redis-command-common")
 
     TEST_CASE("mget returns values and nil for missing keys")
     {
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(string_commands::set(
                   Arguments{ "SET", "__common_mget_k1__", "v1" })) == "+OK\r\n");
 
@@ -49,23 +50,26 @@ TEST_SUITE("redis-command-common")
         CHECK(response_to_string(resp) == "*2\r\n$2\r\nv1\r\n$-1\r\n");
     }
 
-    TEST_CASE("db()size and flushdb() work")
+    TEST_CASE("application_context::db()size and flushapplication_context::db() work")
     {
-        db().flush();
-        CHECK(response_to_string(common_commands::dbsize(Arguments{ "db()SIZE" })) == ":0\r\n");
+        application_context::db().flush();
+        CHECK(response_to_string(common_commands::dbsize(
+                  Arguments{ "application_context::db()SIZE" })) == ":0\r\n");
 
         CHECK(response_to_string(string_commands::set(
                   Arguments{ "SET", "__common_size_k1__", "v1" })) == "+OK\r\n");
-        CHECK(response_to_string(common_commands::dbsize(Arguments{ "db()SIZE" })) == ":1\r\n");
+        CHECK(response_to_string(common_commands::dbsize(
+                  Arguments{ "application_context::db()SIZE" })) == ":1\r\n");
 
-        CHECK(response_to_string(common_commands::flushdb(Arguments{ "FLUSHdb()", "SYNC" })) ==
-              "+OK\r\n");
-        CHECK(response_to_string(common_commands::dbsize(Arguments{ "db()SIZE" })) == ":0\r\n");
+        CHECK(response_to_string(common_commands::flushdb(
+                  Arguments{ "FLUSHapplication_context::db()", "SYNC" })) == "+OK\r\n");
+        CHECK(response_to_string(common_commands::dbsize(
+                  Arguments{ "application_context::db()SIZE" })) == ":0\r\n");
     }
 
     TEST_CASE("expire ttl persist basic path")
     {
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(string_commands::set(
                   Arguments{ "SET", "__common_ttl_k1__", "v1" })) == "+OK\r\n");
 

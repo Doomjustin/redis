@@ -2,6 +2,7 @@
 #define XIN_REDIS_APPLICATION_CONTEXT_H
 
 #include <base_aof_logger.h>
+#include <redis_storage.h>
 
 #include <cstddef>
 #include <string_view>
@@ -12,7 +13,14 @@ namespace xin::redis {
 struct application_context {
     application_context() = delete;
 
+    using PortType = std::uint16_t;
+
+    static constexpr PortType DEFAULT_PORT = 16379;
+
+    static PortType port;
+
     static constexpr std::string_view AOF_FILE_PATH = "appendonly.aof";
+
     static base::AOFLogger aof_logger;
 
     // replay 期间设为 true，防止重放的写命令被二次写入 AOF
@@ -20,6 +28,8 @@ struct application_context {
 
     // 从 AOF 文件重放所有命令，返回成功执行的命令数
     static auto load_aof() -> std::size_t;
+
+    static auto db(int index = 0) -> Database&;
 };
 
 } // namespace xin::redis

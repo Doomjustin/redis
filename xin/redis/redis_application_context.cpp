@@ -12,7 +12,10 @@
 
 namespace xin::redis {
 
+application_context::PortType application_context::port = application_context::DEFAULT_PORT;
+
 base::AOFLogger application_context::aof_logger{ application_context::AOF_FILE_PATH };
+
 bool application_context::replaying_aof = false;
 
 auto application_context::load_aof() -> std::size_t
@@ -51,6 +54,12 @@ auto application_context::load_aof() -> std::size_t
     replaying_aof = false;
     base::log::info("AOF: 重放完成，共执行 {} 条命令", count);
     return count;
+}
+
+auto application_context::db(int index) -> Database&
+{
+    static Database instance;
+    return instance;
 }
 
 } // namespace xin::redis

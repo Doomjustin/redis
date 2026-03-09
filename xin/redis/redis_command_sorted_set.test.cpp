@@ -1,6 +1,7 @@
 #include "redis_command_sorted_set.h"
 
 #include <doctest/doctest.h>
+#include <redis_application_context.h>
 #include <redis_command_string.h>
 
 #include <string>
@@ -20,14 +21,14 @@ auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
 
 TEST_SUITE("redis-command-sorted-set")
 {
+    using xin::redis::application_context;
     using xin::redis::Arguments;
-    using xin::redis::db;
     using xin::redis::sorted_set_commands;
     using xin::redis::string_commands;
 
     TEST_CASE("zadd and zrange basic path")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(sorted_set_commands::add(
                   Arguments{ "ZADD", "__zset_k1__", "1", "one", "2", "two" })) == ":2\r\n");
@@ -38,7 +39,7 @@ TEST_SUITE("redis-command-sorted-set")
 
     TEST_CASE("zrange withscores returns member-score pairs")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(sorted_set_commands::add(
                   Arguments{ "ZADD", "__zset_k2__", "1", "one", "2", "two" })) == ":2\r\n");
@@ -54,7 +55,7 @@ TEST_SUITE("redis-command-sorted-set")
 
     TEST_CASE("zrange supports negative indexes")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(sorted_set_commands::add(Arguments{
                   "ZADD", "__zset_k3__", "1", "one", "2", "two", "3", "three" })) == ":3\r\n");
@@ -65,7 +66,7 @@ TEST_SUITE("redis-command-sorted-set")
 
     TEST_CASE("zadd updates existing member score and not count as new")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(sorted_set_commands::add(
                   Arguments{ "ZADD", "__zset_k4__", "1", "one" })) == ":1\r\n");
@@ -96,7 +97,7 @@ TEST_SUITE("redis-command-sorted-set")
         CHECK(response_to_string(
                   sorted_set_commands::range(Arguments{ "ZRANGE", "k", "bad", "-1" })) == "*0\r\n");
 
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(string_commands::set(
                   Arguments{ "SET", "__zset_wrongtype_k1__", "v1" })) == "+OK\r\n");
 

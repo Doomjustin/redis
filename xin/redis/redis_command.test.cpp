@@ -1,6 +1,7 @@
 #include "redis_command.h"
 
 #include <doctest/doctest.h>
+#include <redis_application_context.h>
 
 #include <string>
 
@@ -19,9 +20,9 @@ auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
 
 TEST_SUITE("redis-command")
 {
+    using xin::redis::application_context;
     using xin::redis::Arguments;
     using xin::redis::commands;
-    using xin::redis::db;
 
     TEST_CASE("dispatch 空命令返回错误")
     {
@@ -41,7 +42,7 @@ TEST_SUITE("redis-command")
 
     TEST_CASE("dispatch 命令名大小写不敏感")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(commands::dispatch(Arguments{ "ping" })) == "+PONG\r\n");
         CHECK(response_to_string(commands::dispatch(Arguments{ "PiNg", "echo" })) == "+echo\r\n");
@@ -49,7 +50,7 @@ TEST_SUITE("redis-command")
 
     TEST_CASE("dispatch routes to modules")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(commands::dispatch(Arguments{ "set", "__dispatch_k1__", "v1" })) ==
               "+OK\r\n");

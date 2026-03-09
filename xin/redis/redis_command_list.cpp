@@ -3,6 +3,7 @@
 #include "redis_command_define.h"
 
 #include <base_log.h>
+#include <redis_application_context.h>
 
 using namespace xin::base;
 
@@ -19,7 +20,7 @@ auto create_new_list(const Arguments& args) -> ResponsePtr
     for (size_t i = 2; i < args.size(); ++i)
         list->push_front(std::make_shared<std::string>(args[i]));
 
-    db().set(args[1], std::move(list));
+    application_context::db().set(args[1], std::move(list));
 
     return std::make_unique<IntegralResponse>(args.size() - 2);
 }
@@ -45,7 +46,7 @@ auto list_commands::push(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("lpush"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res)
         return create_new_list(args);
 
@@ -65,7 +66,7 @@ auto list_commands::pop(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("lpop"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info("LPOP command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<NullBulkStringResponse>();
@@ -99,7 +100,7 @@ auto list_commands::range(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("lrange"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info("LRANGE command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<ArrayResponse>();

@@ -1,6 +1,7 @@
 #include "redis_command_list.h"
 
 #include <doctest/doctest.h>
+#include <redis_application_context.h>
 #include <redis_command_string.h>
 
 #include <string>
@@ -20,14 +21,14 @@ auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
 
 TEST_SUITE("redis-command-list")
 {
+    using xin::redis::application_context;
     using xin::redis::Arguments;
-    using xin::redis::db;
     using xin::redis::list_commands;
     using xin::redis::string_commands;
 
     TEST_CASE("lpush and lpop order")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(list_commands::push(
                   Arguments{ "LPUSH", "__list_k1__", "a", "b", "c" })) == ":3\r\n");
@@ -44,7 +45,7 @@ TEST_SUITE("redis-command-list")
 
     TEST_CASE("lrange supports positive and negative indexes")
     {
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(list_commands::push(
                   Arguments{ "LPUSH", "__list_k2__", "a", "b", "c" })) == ":3\r\n");
 
@@ -56,7 +57,7 @@ TEST_SUITE("redis-command-list")
 
     TEST_CASE("lrange missing key returns empty list")
     {
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(list_commands::range(
                   Arguments{ "LRANGE", "__list_missing__", "0", "2" })) == "*0\r\n");
     }
@@ -70,7 +71,7 @@ TEST_SUITE("redis-command-list")
         CHECK(response_to_string(list_commands::range(Arguments{ "LRANGE", "k", "0" })) ==
               "-ERR wrong number of arguments for 'lrange' command\r\n");
 
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(string_commands::set(
                   Arguments{ "SET", "__list_wrongtype_k1__", "v1" })) == "+OK\r\n");
 

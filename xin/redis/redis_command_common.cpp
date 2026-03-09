@@ -2,6 +2,7 @@
 
 #include <base_log.h>
 #include <base_string_utility.h>
+#include <redis_application_context.h>
 
 using namespace xin::base;
 
@@ -32,7 +33,7 @@ auto common_commands::keys(const Arguments& args) -> ResponsePtr
 
     auto pattern = std::span{ args.begin() + 1, args.end() };
     log::debug("KEYS command executed with pattern: {}", pattern);
-    auto res = db().keys(pattern);
+    auto res = application_context::db().keys(pattern);
 
     ArrayResponse response{};
     for (auto& item : res)
@@ -51,7 +52,7 @@ auto common_commands::mget(const Arguments& args) -> ResponsePtr
 
     auto keys = std::span{ args.begin() + 1, args.end() };
     log::debug("MGET command executed with keys: {}", keys);
-    auto res = db().mget(keys);
+    auto res = application_context::db().mget(keys);
 
     int found_count = 0;
     ArrayResponse response{};
@@ -67,15 +68,16 @@ auto common_commands::mget(const Arguments& args) -> ResponsePtr
 
 auto flushdb_async(const Arguments& args) -> ResponsePtr
 {
-    db().flush_async();
-    log::debug("FLUSHdb() ASYNC command executed, database clearing initiated in background");
+    application_context::db().flush_async();
+    log::debug("FLUSHapplication_context::db() ASYNC command executed, database clearing initiated "
+               "in background");
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
 auto flushdb_sync(const Arguments& args) -> ResponsePtr
 {
-    db().flush();
-    log::debug("FLUSHdb() SYNC command executed, database cleared");
+    application_context::db().flush();
+    log::debug("FLUSHapplication_context::db() SYNC command executed, database cleared");
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
@@ -90,8 +92,10 @@ auto common_commands::flushdb(const Arguments& args) -> ResponsePtr
     if (args.size() == 2 && strings::to_lowercase(args[1]) == "sync")
         return flushdb_sync(args);
 
-    log::info("FLUSHdb() command received wrong number of arguments or invalid option: {}", args);
-    return std::make_unique<ErrorResponse>(arguments_size_error("flushdb()"));
+    log::info("FLUSHapplication_context::db() command received wrong number of arguments or "
+              "invalid option: {}",
+              args);
+    return std::make_unique<ErrorResponse>(arguments_size_error("flushapplication_context::db()"));
 }
 
 auto common_commands::dbsize(const Arguments& args) -> ResponsePtr
@@ -101,7 +105,7 @@ auto common_commands::dbsize(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("dbsize"));
     }
 
-    auto size = db().size();
+    auto size = application_context::db().size();
     log::debug("dbsize command executed, database size: {}", size);
     return std::make_unique<IntegralResponse>(size);
 }
@@ -118,7 +122,7 @@ auto common_commands::expire(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
 
     auto key = args[1];
-    bool success = db().expire_at(key, *seconds);
+    bool success = application_context::db().expire_at(key, *seconds);
     log::debug("EXPIRE command executed for key: {}, expire time: {} seconds, success: {}", key,
                *seconds, success);
 
@@ -136,9 +140,9 @@ auto common_commands::ttl(const Arguments& args) -> ResponsePtr
     }
 
     auto key = args[1];
-    auto res = db().ttl(key);
+    auto res = application_context::db().ttl(key);
     if (!res) {
-        if (db().contains(key)) {
+        if (application_context::db().contains(key)) {
             log::debug("TTL command executed for key: {}, but key has no expiration", key);
             return std::make_unique<IntegralResponse>(key_no_expire);
         }
@@ -160,7 +164,7 @@ auto common_commands::persist(const Arguments& args) -> ResponsePtr
 
     auto key = args[1];
 
-    if (db().persist(key)) {
+    if (application_context::db().persist(key)) {
         log::debug("PERSIST command executed for key: {}, expiration removed", key);
         return std::make_unique<IntegralResponse>(1);
     }

@@ -2,6 +2,7 @@
 
 #include <base_log.h>
 #include <base_string_utility.h>
+#include <redis_application_context.h>
 
 using namespace xin::base;
 
@@ -13,7 +14,7 @@ auto set_with_expiry(const Arguments& args) -> ResponsePtr
     if (!expiry)
         return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
 
-    db().set(args[1], std::make_shared<std::string>(args[2]), *expiry);
+    application_context::db().set(args[1], std::make_shared<std::string>(args[2]), *expiry);
     log::debug("SET command with expiry executed with key: {}, value: {}, expire time: {} seconds",
                args[1], args[2], *expiry);
     return std::make_unique<SimpleStringResponse>("OK");
@@ -21,7 +22,7 @@ auto set_with_expiry(const Arguments& args) -> ResponsePtr
 
 auto set_persist(const Arguments& args) -> ResponsePtr
 {
-    db().set(args[1], std::make_shared<std::string>(args[2]));
+    application_context::db().set(args[1], std::make_shared<std::string>(args[2]));
     log::debug("SET command executed with key: {} and value: {}", args[1], args[2]);
     return std::make_unique<SimpleStringResponse>("OK");
 }
@@ -45,7 +46,7 @@ auto string_commands::get(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("get"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info("GET command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<NullBulkStringResponse>();

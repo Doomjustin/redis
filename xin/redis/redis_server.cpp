@@ -5,6 +5,7 @@
 #include <asio/error.hpp>
 #include <asio/steady_timer.hpp>
 #include <base_log.h>
+#include <redis_application_context.h>
 #include <redis_command_define.h>
 #include <redis_session.h>
 
@@ -69,7 +70,7 @@ auto Server::erase_expired_data() -> asio::awaitable<void>
 
         co_await timer.async_wait(use_awaitable);
         log::debug("Erasing expired keys...");
-        auto erased = db().erase_expired_keys();
+        auto erased = application_context::db().erase_expired_keys();
         log::debug("Erased {} expired keys", erased);
     }
 }

@@ -1,6 +1,7 @@
 #include "redis_command_hash_table.h"
 
 #include <doctest/doctest.h>
+#include <redis_application_context.h>
 #include <redis_command_string.h>
 
 #include <string>
@@ -25,14 +26,14 @@ auto starts_with(const std::string& value, const std::string& prefix) -> bool
 
 TEST_SUITE("redis-command-hash")
 {
+    using xin::redis::application_context;
     using xin::redis::Arguments;
-    using xin::redis::db;
     using xin::redis::hash_table_commands;
     using xin::redis::string_commands;
 
     TEST_CASE("hset and hget basic behavior")
     {
-        db().flush();
+        application_context::db().flush();
 
         CHECK(response_to_string(hash_table_commands::set(
                   Arguments{ "HSET", "__hash_k1__", "name", "tom", "age", "10" })) == ":2\r\n");
@@ -44,7 +45,7 @@ TEST_SUITE("redis-command-hash")
 
     TEST_CASE("hset update returns number of newly added fields")
     {
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(hash_table_commands::set(
                   Arguments{ "HSET", "__hash_k2__", "name", "tom" })) == ":1\r\n");
 
@@ -54,7 +55,7 @@ TEST_SUITE("redis-command-hash")
 
     TEST_CASE("hgetall returns alternating field-value array")
     {
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(hash_table_commands::set(
                   Arguments{ "HSET", "__hash_k3__", "f1", "v1", "f2", "v2" })) == ":2\r\n");
 
@@ -76,7 +77,7 @@ TEST_SUITE("redis-command-hash")
         CHECK(response_to_string(hash_table_commands::get_all(Arguments{ "HGETALL", "k", "x" })) ==
               "-ERR wrong number of arguments for 'hgetall' command\r\n");
 
-        db().flush();
+        application_context::db().flush();
         CHECK(response_to_string(string_commands::set(
                   Arguments{ "SET", "__hash_wrongtype_k1__", "v1" })) == "+OK\r\n");
         CHECK(response_to_string(

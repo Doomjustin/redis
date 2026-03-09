@@ -1,6 +1,7 @@
 #include "redis_command_hash_table.h"
 
 #include <base_log.h>
+#include <redis_application_context.h>
 
 using namespace xin::base;
 
@@ -23,7 +24,7 @@ auto create_new_hash(const Arguments& args) -> ResponsePtr
             ++new_fields;
     }
 
-    db().set(args[1], std::move(hash));
+    application_context::db().set(args[1], std::move(hash));
 
     return std::make_unique<IntegralResponse>(new_fields);
 }
@@ -84,7 +85,7 @@ auto hash_table_commands::set(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("hset"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
 
     // 如果key不存在，那么就创建一个新的hash对象并插入字段值对
     if (!res)
@@ -109,7 +110,7 @@ auto hash_table_commands::get(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("hget"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info("HGET command executed with key: {}, field: {}, but key does not exist", args[1],
                   args[2]);
@@ -133,7 +134,7 @@ auto hash_table_commands::get_all(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("hgetall"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info("HGETALL command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<ArrayResponse>();

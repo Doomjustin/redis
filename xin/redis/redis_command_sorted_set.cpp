@@ -3,6 +3,7 @@
 #include <base_formats.h>
 #include <base_log.h>
 #include <base_string_utility.h>
+#include <redis_application_context.h>
 #include <redis_command_define.h>
 #include <redis_response.h>
 
@@ -33,7 +34,7 @@ auto create_new_sorted_set(const Arguments& args) -> ResponsePtr
             ++new_elements;
     }
 
-    db().set(args[1], std::move(sorted_set));
+    application_context::db().set(args[1], std::move(sorted_set));
 
     log::debug("ZADD command executed with key: {}, created new sorted set, added {} new elements",
                args[1], new_elements);
@@ -64,7 +65,7 @@ auto add_to_existing_sorted_set(const Arguments& args, SortedSet& sorted_set) ->
 
 auto range(const Arguments& args, bool with_scores) -> ResponsePtr
 {
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info("ZRANGE command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<ArrayResponse>();
@@ -119,7 +120,7 @@ auto sorted_set_commands::add(const Arguments& args) -> ResponsePtr
         return std::make_unique<ErrorResponse>(arguments_size_error("zadd"));
     }
 
-    auto res = db().get(args[1]);
+    auto res = application_context::db().get(args[1]);
     if (!res) {
         log::info(
             "ZADD command executed with key: {}, but key does not exist, creating new sorted set",
