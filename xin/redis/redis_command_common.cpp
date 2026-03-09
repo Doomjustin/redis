@@ -121,6 +121,7 @@ auto common_commands::expire(const Arguments& args) -> ResponsePtr
     bool success = db().expire_at(key, *seconds);
     log::debug("EXPIRE command executed for key: {}, expire time: {} seconds, success: {}", key,
                *seconds, success);
+
     return std::make_unique<IntegralResponse>(success ? 1 : 0);
 }
 
@@ -158,6 +159,7 @@ auto common_commands::persist(const Arguments& args) -> ResponsePtr
     }
 
     auto key = args[1];
+
     if (db().persist(key)) {
         log::debug("PERSIST command executed for key: {}, expiration removed", key);
         return std::make_unique<IntegralResponse>(1);

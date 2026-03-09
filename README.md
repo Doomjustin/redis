@@ -1,25 +1,25 @@
-# Xin Redis（Modern C++）
+# Xin Redis
 
-一个使用 Modern C++（C++23）实现的轻量 Redis 风格服务端。当前聚焦于：
+一个使用 Modern C++ (C++23) 实现的 Redis 风格服务器，定位是学习与工程实践项目，而不是 Redis 的完整替代。
 
-- RESP 协议解析（支持增量解析/半包）
-- 内存存储（String / Hash / List / Sorted Set）
-- 常用命令分发与响应编码
-- 过期时间（TTL）与 `FLUSHDB ASYNC`
+项目当前具备：
 
-> 目标是学习型/实验型实现，不是完整 Redis 替代品。
+- RESP 命令解析（支持增量解析与半包）
+- 基于 `asio` 协程的 TCP 服务端
+- 内存数据库（String / Hash / List / Sorted Set）
+- TTL 过期、周期清理、`FLUSHDB ASYNC`
+- AOF 追加写入与启动重放
+- `doctest` + `ctest` 测试体系
 
-## 当前实现概览
+## 快速开始
 
-- 网络层：`asio` 协程 TCP 服务端（默认端口 `16379`）
-- 协议层：RESP 解析状态机（`RESPParser`）
-- 存储层：进程内单库（`Database`），含过期时间管理
-- 命令层：按模块分发（common/string/hash/list/sorted_set）
-- 测试：`doctest` + `ctest`
+### 1. 环境要求
 
-## 依赖
+- CMake `>= 4.0`
+- C++23 编译器
+- vcpkg（用于依赖管理）
 
-项目通过 `vcpkg.json` 管理依赖：
+依赖声明见 `vcpkg.json`：
 
 - `fmt`
 - `spdlog`
@@ -27,50 +27,46 @@
 - `asio`
 - `ms-gsl`
 
-## 构建
+说明：构建脚本会尝试链接 `jemalloc`（可选，缺失时不影响核心功能）。
 
-### 1) 准备 vcpkg toolchain
-
-确保可用的 vcpkg，并拿到 toolchain 路径，例如：
-
-`/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake`
-
-### 2) 配置与编译
+### 2. 配置与编译
 
 ```bash
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build build
 ```
 
-产物（默认）：
+主要产物：
 
 - 服务端：`build/app/xin-redis-server`
-- 测试程序：`build/xin/xin.test`
+- 客户端占位程序：`build/app/xin-redis-cli`
+- 测试可执行：`build/xin/xin.test`
 
-## 运行
+### 3. 启动与连接
 
-启动服务端：
+启动服务端（默认端口 `16379`）：
 
 ```bash
 ./build/app/xin-redis-server
 ```
 
-使用 `redis-cli` 连接：
+连接测试：
 
 ```bash
 redis-cli -p 16379
 ```
 
-> `app/redis_app_client.cpp` 当前是占位实现（直接返回成功），建议使用 `redis-cli` 测试。
+说明：`app/redis_app_client.cpp` 目前是占位实现，建议使用 `redis-cli`。
 
-## 命令支持矩阵
+## 当前命令支持
 
-### 通用
+按 `xin/redis/redis_command.cpp` 中注册表，当前已实现以下命令：
+
+### Common
 
 - `PING [message]`
 - `MGET key [key ...]`
 - `KEYS key [key ...]`
-	- 当前实现是“按输入 key 列表过滤存在项”，不是 Redis 的通配符匹配语义。
 - `DBSIZE`
 - `FLUSHDB [SYNC|ASYNC]`
 - `EXPIRE key seconds`
@@ -100,90 +96,87 @@ redis-cli -p 16379
 - `ZADD key score member [score member ...]`
 - `ZRANGE key start stop [WITHSCORES]`
 
-## RESP 与行为说明
+## 协议与行为约定
 
-- 命令名大小写不敏感（如 `PiNg` 可正常执行）。
+- 命令名大小写不敏感（内部统一转小写分发）。
+- 类型不匹配时返回：
+`WRONGTYPE Operation against a key holding the wrong kind of value`
 - `GET/HGET/LPOP` 未命中返回 Null Bulk String（`$-1\r\n`）。
 - `MGET/KEYS/HGETALL/LRANGE/ZRANGE` 返回 RESP Array。
-- 类型不匹配返回：
-	- `WRONGTYPE Operation against a key holding the wrong kind of value`
-- `TTL` 语义：
-	- key 不存在：`-2`
-	- key 存在但无过期：`-1`
+- `TTL` 行为：
+- key 不存在时返回 `-2`
+- key 存在但无过期时间时返回 `-1`
 
-## 快速示例
+## 持久化（AOF）
 
-```text
-> SET name xin
-+OK
+- AOF 文件路径固定为当前工作目录下的 `appendonly.aof`。
+- 服务端启动时会先执行 AOF 重放（`application_context::load_aof()`）。
+- 写命令分发前会将原始 RESP 命令追加到 AOF。
+- AOF 后台线程按容量阈值或定时（约 1s）刷盘。
+- 重放期间会关闭二次写入，避免 AOF 自我追加。
 
-> GET name
-$3
-xin
+## 架构说明
 
-> EXPIRE name 10
-:1
+### 网络层
 
-> TTL name
-:9
+- `Server` 使用 `asio::io_context` 与协程 `co_spawn`。
+- 每个连接由 `Session` 协程处理，循环读 socket、解析 RESP、分发命令、回写响应。
 
-> HSET user:100 name tom age 10
-:2
+### 协议层
 
-> LRANGE mylist 0 -1
-*0
-```
+- `RESPParser` 采用状态机：`Start -> ArraySize -> BulkPrefix -> BulkSize -> BulkData`。
+- 支持跨多次 `read_some` 的增量解析。
+
+### 存储层
+
+- 单进程内存数据库（当前 `db(index)` 返回同一个实例）。
+- 过期时间结构与数据分离维护。
+- 服务端额外运行过期清理协程，约每 `100ms` 清理一次到期 key。
+
+### 数据结构
+
+- String: `shared_ptr<string>`
+- Hash: `unordered_map<string, shared_ptr<string>>`
+- List: `list<shared_ptr<string>>`
+- Sorted Set: `std::set` + 成员索引 map 的组合结构
 
 ## 测试
 
-运行测试：
+执行全部测试：
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-或直接执行：
+或直接运行：
 
 ```bash
 ./build/xin/xin.test
 ```
 
-## 项目结构
+测试入口定义在 `xin/unit_test.cpp`，具体用例分布在 `xin/base/*.test.cpp` 与 `xin/redis/*.test.cpp`。
+
+## 目录结构
 
 ```text
-app/            # 可执行程序（server / cli）
-xin/base/       # 基础模块（日志、格式化、工具类等）
-xin/redis/      # 协议、命令、响应、存储、数据结构与测试
-cmake/          # CMake 辅助脚本
+app/         # 程序入口（server / cli）
+xin/base/    # 基础设施：日志、格式化、AOF 等
+xin/redis/   # 协议、命令、会话、存储、数据结构
+cmake/       # CMake 辅助脚本
 ```
 
-## 已知限制（与 Redis 的差异）
+## 已知差异与限制
 
-- 单进程内存存储，无 RDB/AOF 持久化
-- 单 DB（`db(index)` 当前返回同一个实例）
-- `KEYS` 非通配符模式匹配
-- 未覆盖事务、发布订阅、Lua、ACL、集群等能力
-- 当前 Sorted Set 采用 `std::set` + 索引结构，偏向可读性而非极致性能
+- 不是完整 Redis 实现，功能范围聚焦核心命令。
+- 当前是单库模型（`db(index)` 未实现多 DB）。
+- `KEYS` 目前是“输入 key 列表过滤存在项”，不是通配符模式匹配语义。
+- 未实现事务、发布订阅、Lua、ACL、集群等特性。
 
-## Benchmark（示例）
+## 开发路线建议
 
-```bash
-redis-benchmark -p 16379 -t set,get -n 1000000 -q -P 16
-```
+如果你计划继续扩展，优先级建议：
 
-在我机器上的测试结果。
-```bash
-# redis
-redis-benchmark -p 6379 -t set,get -n 1000000 -q -P 16
-SET: 1438848.88 requests per second, p50=0.471 msec
-GET: 1605136.38 requests per second, p50=0.423 msec
-
-# 我的
-redis-benchmark -p 16379 -t set,get -n 1000000 -q -P 16
-WARNING: Could not fetch server CONFIG
-SET: 1317523.00 requests per second, p50=0.607 msec
-GET: 1280409.75 requests per second, p50=0.623 msec
-```
-
-## 后续
-当前的性能测试结果还行，暂时不会考虑优化调优，依然以功能实现为主
+1. 补齐 `DEL/EXISTS/INCR` 等高频命令。
+2. 增加 AOF rewrite 与恢复一致性检查。
+3. 将 `KEYS` 扩展为 Redis 风格 pattern 匹配。
+4. 细化性能基准和压测回归流程。

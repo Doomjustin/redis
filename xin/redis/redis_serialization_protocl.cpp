@@ -153,4 +153,22 @@ auto RESPParser::reset() -> void
     args_.clear();
 }
 
+auto resp::serialize(const arguments& args) -> std::string
+{
+    std::string result;
+    std::size_t estimated_len = 32;
+    for (const auto& arg : args)
+        estimated_len += (args.size() + 16);
+
+    // 预先分配足够的空间，避免多次 realloc
+    // 不是精确值
+    result.reserve(estimated_len);
+
+    result.append(base::xformat("*{}\r\n", args.size()));
+    for (const auto& arg : args)
+        result.append(base::xformat("${}\r\n{}\r\n", arg.size(), arg));
+
+    return result;
+}
+
 } // namespace xin::redis

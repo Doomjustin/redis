@@ -1,15 +1,20 @@
 #include <base_log.h>
+#include <redis_application_context.h>
 #include <redis_server.h>
 
 #include <cstdlib>
 
 using xin::base::log;
+using xin::redis::application_context;
 using xin::redis::Server;
 
 int main(int argc, char* argv[])
 {
     constexpr Server::PortType port = 16379;
     log::set_level(xin::base::LogLevel::Warning);
+
+    application_context::load_aof();
+
     Server server{ port };
 
     try {

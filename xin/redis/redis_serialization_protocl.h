@@ -49,6 +49,14 @@ private:
     auto parse_reading_bulk_data(std::span<const char>& buf) -> std::expected<void, Error>;
 };
 
+struct resp {
+    resp() = delete;
+
+    using arguments = RESPParser::arguments;
+
+    static auto serialize(const arguments& args) -> std::string;
+};
+
 } // namespace xin::redis
 
 #endif // REDIS_SERIALIZATION_PROTOCOL_H

@@ -2,6 +2,7 @@
 
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
+#include <asio/error.hpp>
 #include <asio/steady_timer.hpp>
 #include <base_log.h>
 #include <redis_command_define.h>
@@ -51,10 +52,10 @@ auto Server::dispatch(asio::ip::tcp::socket socket) -> asio::awaitable<void>
         co_await session.start();
     }
     catch (const asio::system_error& e) {
-        if (e.code() != asio::error::operation_aborted)
-            log::error("Session error: {}", e.what());
-        else
-            log::debug("Session ended: {}", e.what());
+        if (e.code() == asio::error::eof || e.code() == asio::error::connection_reset)
+            co_return;
+
+        log::error("Session error: {}", e.what());
     }
 }
 

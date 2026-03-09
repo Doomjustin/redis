@@ -9,7 +9,12 @@
         "program": "${command:cmake.launchTargetPath}",
         "args": [],
         "cwd": "${workspaceFolder}",
-        "environment": [],
+        "environment": [
+            {
+                "name": "LD_LIBRARY_PATH",
+                "value": "/usr/local/lib64:${env:LD_LIBRARY_PATH}"
+            }
+        ],
         "externalConsole": false,
         "MIMode": "lldb"
     },
@@ -23,6 +28,13 @@
     "cmake.configureArgs": [
         "-DCMAKE_TOOLCHAIN_FILE=$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     ],
+    "cmake.configureSettings": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+    },
+    "cmake.environment": {
+        "LD_LIBRARY_PATH": "/usr/local/lib64:${env:LD_LIBRARY_PATH}"
+    },
     "editor.formatOnSave": true,
     "[cpp]": {
         "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
@@ -72,6 +84,7 @@
         "inttypes",
         "iomanip",
         "iosfwd",
+        "jemalloc",
         "lpush",
         "LPUSH",
         "lrange",

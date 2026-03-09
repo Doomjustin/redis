@@ -14,4 +14,5 @@ target_link_libraries(xin_base
         Microsoft.GSL::GSL
     PRIVATE
         spdlog::spdlog
+        jemalloc::jemalloc
 )

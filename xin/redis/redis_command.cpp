@@ -4,6 +4,7 @@
 #include <base_log.h>
 #include <base_string_utility.h>
 #include <fmt/core.h>
+#include <redis_application_context.h>
 #include <redis_command_common.h>
 #include <redis_command_define.h>
 #include <redis_command_hash_table.h>
@@ -21,17 +22,33 @@ namespace {
 using namespace xin::redis;
 using namespace xin::base;
 
-using handlers_table = std::unordered_map<std::string, Handler>;
+enum class Type : std::uint8_t { Read, Write };
+
+struct Command {
+    Type type;
+    Handler handler;
+};
+
+using handlers_table = std::unordered_map<std::string, Command>;
 handlers_table handlers = {
-    { "set", string_commands::set },       { "get", string_commands::get },
-    { "ping", common_commands::ping },     { "keys", common_commands::keys },
-    { "mget", common_commands::mget },     { "flushdb", common_commands::flushdb },
-    { "dbsize", common_commands::dbsize }, { "expire", common_commands::expire },
-    { "ttl", common_commands::ttl },       { "persist", common_commands::persist },
-    { "hget", hash_table_commands::get },  { "hgetall", hash_table_commands::get_all },
-    { "hset", hash_table_commands::set },  { "lpush", list_commands::push },
-    { "lpop", list_commands::pop },        { "lrange", list_commands::range },
-    { "zadd", sorted_set_commands::add },  { "zrange", sorted_set_commands::range },
+    { "set", { .type = Type::Write, .handler = string_commands::set } },
+    { "get", { .type = Type::Read, .handler = string_commands::get } },
+    { "ping", { .type = Type::Read, .handler = common_commands::ping } },
+    { "keys", { .type = Type::Read, .handler = common_commands::keys } },
+    { "mget", { .type = Type::Read, .handler = common_commands::mget } },
+    { "flushdb", { .type = Type::Write, .handler = common_commands::flushdb } },
+    { "dbsize", { .type = Type::Read, .handler = common_commands::dbsize } },
+    { "expire", { .type = Type::Write, .handler = common_commands::expire } },
+    { "ttl", { .type = Type::Read, .handler = common_commands::ttl } },
+    { "persist", { .type = Type::Write, .handler = common_commands::persist } },
+    { "hget", { .type = Type::Read, .handler = hash_table_commands::get } },
+    { "hgetall", { .type = Type::Read, .handler = hash_table_commands::get_all } },
+    { "hset", { .type = Type::Write, .handler = hash_table_commands::set } },
+    { "lpush", { .type = Type::Write, .handler = list_commands::push } },
+    { "lpop", { .type = Type::Write, .handler = list_commands::pop } },
+    { "lrange", { .type = Type::Read, .handler = list_commands::range } },
+    { "zadd", { .type = Type::Write, .handler = sorted_set_commands::add } },
+    { "zrange", { .type = Type::Read, .handler = sorted_set_commands::range } },
 };
 
 } // namespace
@@ -48,7 +65,10 @@ auto commands::dispatch(const Arguments& args) -> ResponsePtr
     if (it == handlers.end())
         return std::make_unique<ErrorResponse>(fmt::format("ERR unknown command '{}'", args[0]));
 
-    return it->second(args);
+    if (it->second.type == Type::Write && !application_context::replaying_aof)
+        application_context::aof_logger.append(resp::serialize(args));
+
+    return it->second.handler(args);
 }
 
 } // namespace xin::redis
