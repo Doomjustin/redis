@@ -156,4 +156,21 @@ TEST_SUITE("redis-storage")
         CHECK(erased == 0);
         CHECK_FALSE(db.get_if<string_type>("k1").has_value());
     }
+
+    TEST_CASE("Database expired_keys returns and erases only expired keys")
+    {
+        Database db;
+        db.set("k1", std::make_shared<std::string>("v1"));
+        db.set("k2", std::make_shared<std::string>("v2"));
+
+        REQUIRE(db.expire_at("k1", 0));
+        REQUIRE(db.expire_at("k2", 2));
+
+        const auto expired = db.expired_keys();
+
+        REQUIRE(expired.size() == 1);
+        CHECK(expired[0] == "k1");
+        CHECK_FALSE(db.contains("k1"));
+        CHECK(db.contains("k2"));
+    }
 }

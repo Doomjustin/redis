@@ -18,14 +18,14 @@ struct sorted_set_commands {
     // set中的元素按照分数从小到大排序，如果分数相同则按照成员的字典序排序
     // 例如：ZADD myzset 1.0 one 2.0 two 3.0 three
     // 返回myzset中新增的元素数量，如果myzset之前不存在，那么返回3
-    static auto add(const Arguments& args) -> ResponsePtr;
+    static auto add(std::size_t index, const Arguments& args) -> ResponsePtr;
 
     // ZRANGE key start stop [WITHSCORES]
     // 返回指定范围内的元素，按分数从小到大排序
     // start和stop是索引，支持负数索引，-1表示最后一个元素
     // 如果指定了WITHSCORES选项，那么返回的元素会包含分数，格式为：member1 score1 member2 score2 ...
     // 例如：ZRANGE myzset 0 -1 WITHSCORES  返回myzset中所有元素和分数
-    static auto range(const Arguments& args) -> ResponsePtr;
+    static auto range(std::size_t index, const Arguments& args) -> ResponsePtr;
 };
 
 } // namespace xin::redis

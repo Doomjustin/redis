@@ -17,6 +17,8 @@ auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
     return out;
 }
 
+std::size_t db_index = 0;
+
 } // namespace
 
 TEST_SUITE("redis-command-string")
@@ -28,47 +30,48 @@ TEST_SUITE("redis-command-string")
 
     TEST_CASE("set and get basic path")
     {
-        application_context::db().flush();
+        application_context::db(db_index).flush();
 
-        CHECK(response_to_string(string_commands::set(Arguments{ "SET", "__string_k1__", "v1" })) ==
-              "+OK\r\n");
-        CHECK(response_to_string(string_commands::get(Arguments{ "GET", "__string_k1__" })) ==
-              "$2\r\nv1\r\n");
+        CHECK(response_to_string(string_commands::set(
+                  db_index, Arguments{ "SET", "__string_k1__", "v1" })) == "+OK\r\n");
+        CHECK(response_to_string(string_commands::get(
+                  db_index, Arguments{ "GET", "__string_k1__" })) == "$2\r\nv1\r\n");
     }
 
     TEST_CASE("get missing key returns null bulk")
     {
-        application_context::db().flush();
-        CHECK(response_to_string(string_commands::get(Arguments{ "GET", "__string_missing__" })) ==
-              "$-1\r\n");
+        application_context::db(db_index).flush();
+        CHECK(response_to_string(string_commands::get(
+                  db_index, Arguments{ "GET", "__string_missing__" })) == "$-1\r\n");
     }
 
     TEST_CASE("set with ex option")
     {
-        application_context::db().flush();
+        application_context::db(db_index).flush();
         CHECK(response_to_string(string_commands::set(
-                  Arguments{ "SET", "__string_ex_k1__", "v1", "EX", "60" })) == "+OK\r\n");
+                  db_index, Arguments{ "SET", "__string_ex_k1__", "v1", "EX", "60" })) ==
+              "+OK\r\n");
     }
 
     TEST_CASE("set and get argument validation")
     {
-        CHECK(response_to_string(string_commands::set(Arguments{ "SET", "k_only" })) ==
+        CHECK(response_to_string(string_commands::set(db_index, Arguments{ "SET", "k_only" })) ==
               "-ERR wrong number of arguments for 'set' command\r\n");
-        CHECK(response_to_string(string_commands::get(Arguments{ "GET" })) ==
+        CHECK(response_to_string(string_commands::get(db_index, Arguments{ "GET" })) ==
               "-ERR wrong number of arguments for 'get' command\r\n");
         CHECK(response_to_string(
-                  string_commands::set(Arguments{ "SET", "k", "v", "EX", "not_int" })) ==
+                  string_commands::set(db_index, Arguments{ "SET", "k", "v", "EX", "not_int" })) ==
               "-ERR value is not an integer or out of range\r\n");
     }
 
     TEST_CASE("get returns wrongtype when key is list")
     {
-        application_context::db().flush();
+        application_context::db(db_index).flush();
         CHECK(response_to_string(list_commands::push(
-                  Arguments{ "LPUSH", "__string_wrongtype_k1__", "a" })) == ":1\r\n");
+                  db_index, Arguments{ "LPUSH", "__string_wrongtype_k1__", "a" })) == ":1\r\n");
 
         CHECK(response_to_string(
-                  string_commands::get(Arguments{ "GET", "__string_wrongtype_k1__" })) ==
+                  string_commands::get(db_index, Arguments{ "GET", "__string_wrongtype_k1__" })) ==
               "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n");
     }
 }

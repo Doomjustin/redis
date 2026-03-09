@@ -17,9 +17,13 @@ struct application_context {
 
     static constexpr PortType DEFAULT_PORT = 16379;
 
-    static PortType port;
+    static constexpr std::size_t DB_COUNT = 16;
 
     static constexpr std::string_view AOF_FILE_PATH = "appendonly.aof";
+
+    static PortType port;
+
+    static std::array<Database, application_context::DB_COUNT> databases;
 
     static base::AOFLogger aof_logger;
 
@@ -29,7 +33,7 @@ struct application_context {
     // 从 AOF 文件重放所有命令，返回成功执行的命令数
     static auto load_aof() -> std::size_t;
 
-    static auto db(int index = 0) -> Database&;
+    static auto db(std::size_t index) -> Database&;
 };
 
 } // namespace xin::redis

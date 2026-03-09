@@ -6,6 +6,7 @@
 #include <asio/steady_timer.hpp>
 #include <base_log.h>
 #include <redis_application_context.h>
+#include <redis_command.h>
 #include <redis_command_define.h>
 #include <redis_session.h>
 
@@ -40,8 +41,6 @@ auto Server::listen() -> asio::awaitable<void>
 
     while (true) {
         auto socket = co_await acceptor_->async_accept(use_awaitable);
-        // 启动一个新的协程处理这个连接，detached
-        // 表示我们不关心这个协程什么时候结束（它自己会管自己）
         co_spawn(acceptor_->get_executor(), dispatch(std::move(socket)), detached);
     }
 }
@@ -70,8 +69,23 @@ auto Server::erase_expired_data() -> asio::awaitable<void>
 
         co_await timer.async_wait(use_awaitable);
         log::debug("Erasing expired keys...");
-        auto erased = application_context::db().erase_expired_keys();
-        log::debug("Erased {} expired keys", erased);
+
+        // 遍历所有数据库，删除过期的键
+        for (std::size_t index = 0; auto& db : application_context::databases) {
+            auto erased_keys = db.expired_keys();
+
+            if (erased_keys.empty()) {
+                log::debug("DB{} have no expired keys.", index);
+            }
+            else {
+                log::debug("Erased keys from DB{}: {}", index, erased_keys);
+                // 通过执行删除命令，确保aof可以记录删除操作
+                erased_keys.insert(erased_keys.begin(), "del");
+                commands::dispatch(index, erased_keys);
+            }
+
+            ++index;
+        }
     }
 }
 

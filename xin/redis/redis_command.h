@@ -7,7 +7,7 @@ namespace xin::redis {
 struct commands {
     commands() = delete;
 
-    static auto dispatch(const Arguments& args) -> ResponsePtr;
+    static auto dispatch(std::size_t& index, const Arguments& args) -> ResponsePtr;
 };
 
 } // namespace xin::redis

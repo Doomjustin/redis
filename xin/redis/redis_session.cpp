@@ -28,7 +28,7 @@ auto Session::start() -> asio::awaitable<void>
             if (res) {
                 log::debug("Command: {}", res->at(0));
 
-                auto response = commands::dispatch(*res);
+                auto response = commands::dispatch(index_, *res);
                 responses.push_back(std::move(response));
 
                 parser_.reset();

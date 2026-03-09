@@ -36,11 +36,13 @@ handlers_table handlers = {
     { "ping", { .type = Type::Read, .handler = common_commands::ping } },
     { "keys", { .type = Type::Read, .handler = common_commands::keys } },
     { "mget", { .type = Type::Read, .handler = common_commands::mget } },
+    { "del", { .type = Type::Write, .handler = common_commands::del } },
     { "flushdb", { .type = Type::Write, .handler = common_commands::flushdb } },
     { "dbsize", { .type = Type::Read, .handler = common_commands::dbsize } },
     { "expire", { .type = Type::Write, .handler = common_commands::expire } },
     { "ttl", { .type = Type::Read, .handler = common_commands::ttl } },
     { "persist", { .type = Type::Write, .handler = common_commands::persist } },
+    { "exists", { .type = Type::Read, .handler = common_commands::exists } },
     { "hget", { .type = Type::Read, .handler = hash_table_commands::get } },
     { "hgetall", { .type = Type::Read, .handler = hash_table_commands::get_all } },
     { "hset", { .type = Type::Write, .handler = hash_table_commands::set } },
@@ -51,24 +53,63 @@ handlers_table handlers = {
     { "zrange", { .type = Type::Read, .handler = sorted_set_commands::range } },
 };
 
+// select index
+// Change the selected database for the current connection. The index of the selected database
+// is specified by the index argument. The default database is 0, and the default number of
+// databases is 16.
+auto select(std::size_t& index, const Arguments& args) -> ResponsePtr
+{
+    if (args.size() != 2) {
+        log::info("SELECT command received wrong number of arguments: {}", args);
+        return std::make_unique<ErrorResponse>(arguments_size_error("select"));
+    }
+
+    auto new_index = numeric_cast<std::size_t>(args[1]);
+    if (!new_index)
+        return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
+
+    if (*new_index >= application_context::DB_COUNT)
+        return std::make_unique<ErrorResponse>("ERR invalid DB index");
+
+    index = *new_index;
+    log::debug("SELECT command executed, selected database: {}", *new_index);
+
+    return std::make_unique<SimpleStringResponse>("OK");
+}
+
+std::size_t last_db_index = 0;
+
 } // namespace
 
 namespace xin::redis {
 
-auto commands::dispatch(const Arguments& args) -> ResponsePtr
+auto commands::dispatch(std::size_t& index, const Arguments& args) -> ResponsePtr
 {
     if (args.empty())
         return std::make_unique<ErrorResponse>("ERR empty command");
 
     using namespace xin::base;
-    auto it = handlers.find(strings::to_lowercase(args[0]));
+
+    // SELECT命令是特殊的，我们单独处理，确保它在AOF中正确记录数据库切换
+    auto command = strings::to_lowercase(args[0]);
+    if (command == "select")
+        return select(index, args);
+
+    auto it = handlers.find(command);
     if (it == handlers.end())
-        return std::make_unique<ErrorResponse>(fmt::format("ERR unknown command '{}'", args[0]));
+        return std::make_unique<ErrorResponse>(xformat("ERR unknown command '{}'", args[0]));
 
-    if (it->second.type == Type::Write && !application_context::replaying_aof)
+    if (it->second.type == Type::Write && !application_context::replaying_aof) {
+        if (last_db_index != index) {
+            auto select_args = Arguments{ "SELECT", std::to_string(index) };
+            application_context::aof_logger.append(resp::serialize(select_args));
+            last_db_index = index;
+        }
+
         application_context::aof_logger.append(resp::serialize(args));
+    }
 
-    return it->second.handler(args);
+    return it->second.handler(index, args);
 }
 
 } // namespace xin::redis

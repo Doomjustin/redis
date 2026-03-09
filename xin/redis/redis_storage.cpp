@@ -82,20 +82,20 @@ auto Database::persist(const KeyType& key) -> bool
     return false;
 }
 
-auto Database::erase_expired_keys() -> int
+auto Database::expired_keys() -> std::vector<std::string>
 {
-    int count = 0;
     auto expiry = now();
+    std::vector<std::string> expired_keys;
     for (auto it = expires_.begin(); it != expires_.end();) {
         if (it->first > expiry)
-            return count;
+            break;
 
+        expired_keys.emplace_back(it->second);
         data_.erase(std::string{ it->second });
         it = expires_.erase(it);
-        ++count;
     }
 
-    return count;
+    return expired_keys;
 }
 
 auto Database::now() -> Seconds

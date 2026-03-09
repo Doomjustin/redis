@@ -24,6 +24,7 @@ private:
     asio::ip::tcp::socket socket_;
     std::array<char, BUFFER_SIZE> buffer_{};
     std::size_t write_idx_ = 0;
+    std::size_t index_ = 0;
     RESPParser parser_{};
     std::vector<std::unique_ptr<Response>> responses;
 };

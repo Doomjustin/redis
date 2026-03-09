@@ -136,7 +136,7 @@ public:
 
     auto persist(const KeyType& key) -> bool;
 
-    auto erase_expired_keys() -> int;
+    auto expired_keys() -> std::vector<std::string>;
 
     [[nodiscard]]
     constexpr auto size() const noexcept -> SizeType

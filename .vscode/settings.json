@@ -40,6 +40,8 @@
         "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
     },
     "cSpell.words": [
+        "appendfsync",
+        "BADSCORES",
         "buildsystems",
         "cassert",
         "cerrno",
@@ -69,10 +71,12 @@
         "cwctype",
         "DBSIZE",
         "DCMAKE",
+        "DECR",
         "deque",
         "dlfcn",
         "eigen",
         "errno",
+        "everysec",
         "fcntl",
         "fenv",
         "FLUSHDB",
@@ -89,12 +93,15 @@
         "LPUSH",
         "lrange",
         "MGET",
+        "MPSC",
         "mqueue",
+        "MSET",
         "netdb",
         "netinet",
         "pthread",
         "richedit",
         "setjmp",
+        "SETNX",
         "shellapi",
         "shlobj",
         "sstream",
@@ -131,6 +138,7 @@
         "winsock",
         "winuser",
         "wordexp",
-        "WRONGTYPE"
+        "WRONGTYPE",
+        "zset"
     ],
 }

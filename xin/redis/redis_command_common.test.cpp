@@ -17,6 +17,15 @@ auto response_to_string(const xin::redis::ResponsePtr& resp) -> std::string
     return out;
 }
 
+void reset_all_databases()
+{
+    using xin::redis::application_context;
+    for (auto& db : application_context::databases)
+        db.flush();
+}
+
+std::size_t db_index = 0;
+
 } // namespace
 
 TEST_SUITE("redis-command-common")
@@ -28,61 +37,109 @@ TEST_SUITE("redis-command-common")
 
     TEST_CASE("ping returns pong or echo")
     {
-        CHECK(response_to_string(common_commands::ping(Arguments{ "PING" })) == "+PONG\r\n");
-        CHECK(response_to_string(common_commands::ping(Arguments{ "PING", "hello" })) ==
+        CHECK(response_to_string(common_commands::ping(db_index, Arguments{ "PING" })) ==
+              "+PONG\r\n");
+        CHECK(response_to_string(common_commands::ping(db_index, Arguments{ "PING", "hello" })) ==
               "+hello\r\n");
     }
 
     TEST_CASE("ping with invalid arity returns error")
     {
-        CHECK(response_to_string(common_commands::ping(Arguments{ "PING", "a", "b" })) ==
+        CHECK(response_to_string(common_commands::ping(db_index, Arguments{ "PING", "a", "b" })) ==
               "-ERR wrong number of arguments for 'ping' command\r\n");
     }
 
     TEST_CASE("mget returns values and nil for missing keys")
     {
-        application_context::db().flush();
+        reset_all_databases();
         CHECK(response_to_string(string_commands::set(
-                  Arguments{ "SET", "__common_mget_k1__", "v1" })) == "+OK\r\n");
+                  db_index, Arguments{ "SET", "__common_mget_k1__", "v1" })) == "+OK\r\n");
 
         const auto resp = common_commands::mget(
-            Arguments{ "MGET", "__common_mget_k1__", "__common_mget_missing__" });
+            db_index, Arguments{ "MGET", "__common_mget_k1__", "__common_mget_missing__" });
         CHECK(response_to_string(resp) == "*2\r\n$2\r\nv1\r\n$-1\r\n");
     }
 
-    TEST_CASE("application_context::db()size and flushapplication_context::db() work")
+    TEST_CASE("dbsize and flushdb work")
     {
-        application_context::db().flush();
-        CHECK(response_to_string(common_commands::dbsize(
-                  Arguments{ "application_context::db()SIZE" })) == ":0\r\n");
+        reset_all_databases();
+        CHECK(response_to_string(common_commands::dbsize(db_index, Arguments{ "DBSIZE" })) ==
+              ":0\r\n");
 
         CHECK(response_to_string(string_commands::set(
-                  Arguments{ "SET", "__common_size_k1__", "v1" })) == "+OK\r\n");
-        CHECK(response_to_string(common_commands::dbsize(
-                  Arguments{ "application_context::db()SIZE" })) == ":1\r\n");
+                  db_index, Arguments{ "SET", "__common_size_k1__", "v1" })) == "+OK\r\n");
+        CHECK(response_to_string(common_commands::dbsize(db_index, Arguments{ "DBSIZE" })) ==
+              ":1\r\n");
 
-        CHECK(response_to_string(common_commands::flushdb(
-                  Arguments{ "FLUSHapplication_context::db()", "SYNC" })) == "+OK\r\n");
-        CHECK(response_to_string(common_commands::dbsize(
-                  Arguments{ "application_context::db()SIZE" })) == ":0\r\n");
+        CHECK(response_to_string(
+                  common_commands::flushdb(db_index, Arguments{ "FLUSHDB", "SYNC" })) == "+OK\r\n");
+        CHECK(response_to_string(common_commands::dbsize(db_index, Arguments{ "DBSIZE" })) ==
+              ":0\r\n");
+    }
+
+    TEST_CASE("flushdb invalid option returns arity error")
+    {
+        reset_all_databases();
+
+        CHECK(response_to_string(
+                  common_commands::flushdb(db_index, Arguments{ "FLUSHDB", "MAYBE" })) ==
+              "-ERR wrong number of arguments for 'flushdb' command\r\n");
     }
 
     TEST_CASE("expire ttl persist basic path")
     {
-        application_context::db().flush();
+        reset_all_databases();
         CHECK(response_to_string(string_commands::set(
-                  Arguments{ "SET", "__common_ttl_k1__", "v1" })) == "+OK\r\n");
+                  db_index, Arguments{ "SET", "__common_ttl_k1__", "v1" })) == "+OK\r\n");
 
         CHECK(response_to_string(common_commands::expire(
-                  Arguments{ "EXPIRE", "__common_ttl_k1__", "60" })) == ":1\r\n");
+                  db_index, Arguments{ "EXPIRE", "__common_ttl_k1__", "60" })) == ":1\r\n");
 
-        const auto ttl_resp =
-            response_to_string(common_commands::ttl(Arguments{ "TTL", "__common_ttl_k1__" }));
+        const auto ttl_resp = response_to_string(
+            common_commands::ttl(db_index, Arguments{ "TTL", "__common_ttl_k1__" }));
         CHECK(ttl_resp[0] == ':');
 
         CHECK(response_to_string(common_commands::persist(
-                  Arguments{ "PERSIST", "__common_ttl_k1__" })) == ":1\r\n");
-        CHECK(response_to_string(common_commands::ttl(Arguments{ "TTL", "__common_ttl_k1__" })) ==
-              ":-1\r\n");
+                  db_index, Arguments{ "PERSIST", "__common_ttl_k1__" })) == ":1\r\n");
+        CHECK(response_to_string(common_commands::ttl(
+                  db_index, Arguments{ "TTL", "__common_ttl_k1__" })) == ":-1\r\n");
+    }
+
+    TEST_CASE("del removes existing keys and ignores missing keys")
+    {
+        reset_all_databases();
+        CHECK(response_to_string(string_commands::set(
+                  db_index, Arguments{ "SET", "__del_k1__", "v1" })) == "+OK\r\n");
+        CHECK(response_to_string(string_commands::set(
+                  db_index, Arguments{ "SET", "__del_k2__", "v2" })) == "+OK\r\n");
+
+        CHECK(response_to_string(common_commands::del(
+                  db_index, Arguments{ "DEL", "__del_k1__", "__del_missing__", "__del_k2__" })) ==
+              ":2\r\n");
+        CHECK(response_to_string(common_commands::exists(
+                  db_index, Arguments{ "EXISTS", "__del_k1__", "__del_k2__" })) == ":0\r\n");
+    }
+
+    TEST_CASE("del with single key returns erased count")
+    {
+        reset_all_databases();
+        CHECK(response_to_string(string_commands::set(
+                  db_index, Arguments{ "SET", "__del_single_k1__", "v1" })) == "+OK\r\n");
+
+        CHECK(response_to_string(common_commands::del(
+                  db_index, Arguments{ "DEL", "__del_single_k1__" })) == ":1\r\n");
+        CHECK(response_to_string(common_commands::exists(
+                  db_index, Arguments{ "EXISTS", "__del_single_k1__" })) == ":0\r\n");
+    }
+
+    TEST_CASE("exists returns number of existing keys")
+    {
+        reset_all_databases();
+        CHECK(response_to_string(string_commands::set(
+                  db_index, Arguments{ "SET", "__exists_k1__", "v1" })) == "+OK\r\n");
+
+        CHECK(response_to_string(common_commands::exists(
+                  db_index, Arguments{ "EXISTS", "__exists_k1__", "__exists_k1__",
+                                       "__exists_missing__" })) == ":2\r\n");
     }
 }

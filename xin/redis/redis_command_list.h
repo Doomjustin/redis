@@ -14,7 +14,7 @@ struct list_commands {
     // If key holds a value that is not a list, an error is returned.
     // The command returns the length of the list after the push operations.
     // If the command is called with less than 3 arguments, an error is returned.
-    static auto push(const Arguments& args) -> ResponsePtr;
+    static auto push(std::size_t index, const Arguments& args) -> ResponsePtr;
 
     // lpop key
     // If the key does not exist, it returns a Null Bulk String.
@@ -22,7 +22,7 @@ struct list_commands {
     // If the key exists and holds a list value, but the list is empty, it returns a Null Bulk
     // String. If the key exists and holds a list value, and the list is not empty, it removes and
     // returns the first element of the list.
-    static auto pop(const Arguments& args) -> ResponsePtr;
+    static auto pop(std::size_t index, const Arguments& args) -> ResponsePtr;
 
     // lrange key start stop
     // If the key does not exist, it returns an empty list.
@@ -31,7 +31,7 @@ struct list_commands {
     // stored at the key. The offsets start and stop are zero-based indexes, with 0 being the first
     // element of the list (the head of the list), 1 being the next element and so on. These offsets
     // can also be negative numbers indicating offsets starting at the end of the list.
-    static auto range(const Arguments& args) -> ResponsePtr;
+    static auto range(std::size_t index, const Arguments& args) -> ResponsePtr;
 };
 
 } // namespace xin::redis
