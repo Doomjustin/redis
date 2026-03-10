@@ -15,7 +15,7 @@ namespace {
 
 using namespace xin::redis;
 
-using SortedSet = Database::SortedSetType;
+using SortedSet = Database::SortedSet;
 using SortedSetPtr = Database::SortedSetPtr;
 
 auto create_new_sorted_set(Database& db, const Arguments& args) -> ResponsePtr

@@ -4,7 +4,7 @@
 
 namespace xin::redis {
 
-auto Database::get(const KeyType& key) -> std::optional<ValueType>
+auto Database::get(const Key& key) -> std::optional<Value>
 {
     if (erase_if_expired(key))
         return {};
@@ -16,7 +16,7 @@ auto Database::get(const KeyType& key) -> std::optional<ValueType>
     return {};
 }
 
-auto Database::expire_at(const KeyType& key, Seconds seconds) -> bool
+auto Database::expire_at(const Key& key, Seconds seconds) -> bool
 {
     auto data_it = data_.find(key);
     if (data_it == data_.end())
@@ -27,7 +27,7 @@ auto Database::expire_at(const KeyType& key, Seconds seconds) -> bool
     return true;
 }
 
-auto Database::ttl(const KeyType& key) -> std::optional<Seconds>
+auto Database::ttl(const Key& key) -> std::optional<Seconds>
 {
     if (erase_if_expired(key))
         return {};
@@ -40,7 +40,7 @@ auto Database::ttl(const KeyType& key) -> std::optional<Seconds>
     return remaining / 1000; // 转换为秒
 }
 
-auto Database::contains(const KeyType& key) -> bool
+auto Database::contains(const Key& key) -> bool
 {
     if (erase_if_expired(key))
         return false;
@@ -71,7 +71,7 @@ void Database::flush_async()
     t.detach();
 }
 
-auto Database::persist(const KeyType& key) -> bool
+auto Database::persist(const Key& key) -> bool
 {
     auto it = find_expire_time(key);
     if (it != expires_.end()) {
@@ -105,7 +105,7 @@ auto Database::now() -> Seconds
     return std::chrono::duration_cast<TimeUnit>(epoch).count();
 }
 
-auto Database::erase_if_expired(const KeyType& key) -> bool
+auto Database::erase_if_expired(const Key& key) -> bool
 {
     auto it = find_expire_time(key);
     if (it != expires_.end() && now() >= it->first) {

@@ -14,7 +14,7 @@ namespace xin::redis {
 
 std::array<Database, application_context::DB_COUNT> application_context::databases{};
 
-application_context::PortType application_context::port = application_context::DEFAULT_PORT;
+application_context::Port application_context::port = application_context::DEFAULT_PORT;
 
 base::AOFLogger application_context::aof_logger{ application_context::AOF_FILE_PATH };
 

@@ -10,7 +10,7 @@ TEST_SUITE("redis-server")
     {
         using xin::redis::Server;
 
-        CHECK(std::is_constructible_v<Server, Server::PortType>);
+        CHECK(std::is_constructible_v<Server, Server::Port>);
         CHECK(!std::is_copy_constructible_v<Server>);
         CHECK(!std::is_copy_assignable_v<Server>);
         CHECK(!std::is_move_constructible_v<Server>);

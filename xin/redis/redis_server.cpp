@@ -15,7 +15,7 @@ using namespace asio;
 
 namespace xin::redis {
 
-Server::Server(PortType port, int thread_count)
+Server::Server(Port port, int thread_count)
     : port_{ port }
     , context_{ thread_count }
 {
@@ -35,8 +35,8 @@ void Server::start()
 
 auto Server::listen() -> asio::awaitable<void>
 {
-    acceptor_ = std::make_unique<AcceptorType>(co_await this_coro::executor,
-                                               ip::tcp::endpoint(ip::tcp::v4(), port_));
+    acceptor_ = std::make_unique<Acceptor>(co_await this_coro::executor,
+                                           ip::tcp::endpoint(ip::tcp::v4(), port_));
     log::info("Listening on port {}", port_);
 
     while (true) {

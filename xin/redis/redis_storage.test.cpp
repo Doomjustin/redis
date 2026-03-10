@@ -44,7 +44,7 @@ TEST_SUITE("redis-storage")
     TEST_CASE("Database get_if 类型不匹配时返回空")
     {
         Database db;
-        auto h = std::make_shared<std::unordered_map<Database::KeyType, string_type>>();
+        auto h = std::make_shared<std::unordered_map<Database::Key, string_type>>();
         h->insert_or_assign("field", std::make_shared<std::string>("value"));
         db.set("hk", h);
 
@@ -62,7 +62,7 @@ TEST_SUITE("redis-storage")
         db.set("k1", std::make_shared<std::string>("v1"));
         db.set("k3", std::make_shared<std::string>("v3"));
 
-        std::vector<Database::KeyType> keys{ "k1", "k2", "k3" };
+        std::vector<Database::Key> keys{ "k1", "k2", "k3" };
         auto got = db.mget(keys);
 
         REQUIRE(got.size() == 3);
@@ -79,7 +79,7 @@ TEST_SUITE("redis-storage")
         db.set("k1", std::make_shared<std::string>("v1"));
         db.set("k2", std::make_shared<std::string>("v2"));
 
-        std::vector<Database::KeyType> keys{ "k1", "k3" };
+        std::vector<Database::Key> keys{ "k1", "k3" };
         const auto erased = db.erase(keys);
 
         CHECK(erased == 1);
@@ -150,7 +150,7 @@ TEST_SUITE("redis-storage")
         db.set("k1", std::make_shared<std::string>("v1"));
         REQUIRE(db.expire_at("k1", 0));
 
-        std::vector<Database::KeyType> keys{ "k1" };
+        std::vector<Database::Key> keys{ "k1" };
         const auto erased = db.erase(keys);
 
         CHECK(erased == 0);

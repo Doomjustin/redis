@@ -29,8 +29,8 @@ struct Command {
     Handler handler;
 };
 
-using CommandTable = std::unordered_map<std::string, Command>;
-CommandTable command_table = {
+using Commands = std::unordered_map<std::string, Command>;
+Commands commands_table = {
     { "set", { .type = Type::Write, .handler = string_commands::set } },
     { "get", { .type = Type::Read, .handler = string_commands::get } },
     { "ping", { .type = Type::Read, .handler = common_commands::ping } },
@@ -68,8 +68,8 @@ auto commands::dispatch(std::size_t& index, const Arguments& args) -> ResponsePt
     if (command == "select")
         return common_commands::select(index, args);
 
-    auto it = command_table.find(command);
-    if (it == command_table.end())
+    auto it = commands_table.find(command);
+    if (it == commands_table.end())
         return std::make_unique<ErrorResponse>(xformat("ERR unknown command '{}'", args[0]));
 
     // 避免重建时二次写入AOF日志

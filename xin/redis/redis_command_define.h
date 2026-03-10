@@ -11,11 +11,11 @@ namespace xin::redis {
 using Arguments = RESPParser::arguments;
 using ResponsePtr = std::unique_ptr<Response>;
 using Handler = std::function<ResponsePtr(Database&, const Arguments&)>;
-using StringType = Database::StringType;
+using StringType = Database::String;
 using StringPtr = Database::StringPtr;
-using HashType = Database::HashType;
+using HashType = Database::Hash;
 using HashPtr = Database::HashPtr;
-using ListType = Database::ListType;
+using ListType = Database::List;
 using ListPtr = Database::ListPtr;
 
 static constexpr std::string_view WRONG_TYPE_ERR =

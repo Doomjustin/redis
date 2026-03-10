@@ -11,9 +11,9 @@ namespace xin::redis {
 
 class Server {
 public:
-    using PortType = std::uint16_t;
+    using Port = std::uint16_t;
 
-    Server(PortType port, int thread_count = 1);
+    Server(Port port, int thread_count = 1);
 
     Server(const Server&) = delete;
     auto operator=(const Server&) -> Server& = delete;
@@ -26,10 +26,10 @@ public:
     void start();
 
 private:
-    using AcceptorType = asio::ip::tcp::acceptor;
+    using Acceptor = asio::ip::tcp::acceptor;
 
-    PortType port_;
-    std::unique_ptr<AcceptorType> acceptor_;
+    Port port_;
+    std::unique_ptr<Acceptor> acceptor_;
     asio::io_context context_;
 
     auto listen() -> asio::awaitable<void>;

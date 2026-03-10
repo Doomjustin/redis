@@ -13,15 +13,15 @@ namespace xin::redis {
 struct application_context {
     application_context() = delete;
 
-    using PortType = std::uint16_t;
+    using Port = std::uint16_t;
 
-    static constexpr PortType DEFAULT_PORT = 16379;
+    static constexpr Port DEFAULT_PORT = 16379;
 
     static constexpr std::size_t DB_COUNT = 16;
 
     static constexpr std::string_view AOF_FILE_PATH = "appendonly.aof";
 
-    static PortType port;
+    static Port port;
 
     static std::array<Database, application_context::DB_COUNT> databases;
 

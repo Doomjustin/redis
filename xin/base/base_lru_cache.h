@@ -14,11 +14,9 @@ private:
     struct Node;
 
 public:
-    using KeyType = Key;
-    using ValueType = Value;
-    using SizeType = std::size_t;
+    using Size = std::size_t;
 
-    LRUCache(SizeType capacity)
+    LRUCache(Size capacity)
         : capacity_{ capacity }
     {
         head_->next = tail_.get();
@@ -33,7 +31,7 @@ public:
 
     ~LRUCache() = default;
 
-    auto get(const KeyType& key) noexcept -> std::optional<ValueType>
+    auto get(const Key& key) noexcept -> std::optional<Value>
     {
         if (!cache_.contains(key))
             return {};
@@ -43,7 +41,7 @@ public:
         return node->value;
     }
 
-    void put(KeyType key, ValueType value)
+    void put(Key key, Value value)
     {
         if (cache_.contains(key)) {
             auto node = cache_[key].get();
@@ -63,22 +61,22 @@ public:
     }
 
     [[nodiscard]]
-    constexpr auto size() const noexcept -> SizeType
+    constexpr auto size() const noexcept -> Size
     {
         return cache_.size();
     }
 
     [[nodiscard]]
-    constexpr auto capacity() const noexcept -> SizeType
+    constexpr auto capacity() const noexcept -> Size
     {
         return capacity_;
     }
 
 private:
-    SizeType capacity_ = 0;
+    Size capacity_ = 0;
     std::unique_ptr<Node> head_ = std::make_unique<Node>();
     std::unique_ptr<Node> tail_ = std::make_unique<Node>();
-    std::unordered_map<KeyType, std::unique_ptr<Node>> cache_;
+    std::unordered_map<Key, std::unique_ptr<Node>> cache_;
 
     void add_to_head(Node* node)
     {

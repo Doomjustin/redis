@@ -16,44 +16,44 @@ namespace xin::redis {
 // 但是本作不准备用这套API了，改用一个单独的TrackingMemoryResource来实现内存跟踪
 // 这里保留原API的实现以兼容现有代码，但不再推荐使用
 struct allocator {
-    using SizeType = std::size_t;
-    using ErrorHandler = std::function<void(SizeType size)>;
+    using Size = std::size_t;
+    using ErrorHandler = std::function<void(Size size)>;
 
-    static constexpr SizeType PREFIX_SIZE = sizeof(SizeType);
+    static constexpr Size PREFIX_SIZE = sizeof(Size);
 
-    static auto malloc(SizeType size) -> void*;
+    static auto malloc(Size size) -> void*;
 
     template<typename T>
-    static auto malloc(SizeType size) -> T*
+    static auto malloc(Size size) -> T*
     {
         return static_cast<T*>(malloc(size * sizeof(T)));
     }
 
-    static auto calloc(SizeType size) -> void*;
+    static auto calloc(Size size) -> void*;
 
     template<typename T>
-    static auto calloc(SizeType size) -> T*
+    static auto calloc(Size size) -> T*
     {
         return static_cast<T*>(calloc(size * sizeof(T)));
     }
 
-    static auto size(void* ptr) -> SizeType;
+    static auto size(void* ptr) -> Size;
 
-    static auto realloc(void* ptr, SizeType size) -> void*;
+    static auto realloc(void* ptr, Size size) -> void*;
 
     static auto free(void* ptr) -> void;
 
-    static auto used_memory() -> SizeType;
+    static auto used_memory() -> Size;
 
     static void on_error(ErrorHandler handler);
 
 private:
-    static std::atomic<SizeType> used_memory_;
+    static std::atomic<Size> used_memory_;
     static ErrorHandler error_handler_;
 
-    static void append_used_memory(SizeType size);
+    static void append_used_memory(Size size);
 
-    static void remove_used_memory(SizeType size);
+    static void remove_used_memory(Size size);
 };
 
 // 一个基于std::pmr::memory_resource的内存跟踪器，

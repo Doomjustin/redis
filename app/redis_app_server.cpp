@@ -10,7 +10,7 @@ using xin::redis::Server;
 
 int main(int argc, char* argv[])
 {
-    constexpr Server::PortType port = 16379;
+    constexpr Server::Port port = 16379;
     log::set_level(xin::base::LogLevel::Warning);
 
     application_context::load_aof();

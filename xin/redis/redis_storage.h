@@ -21,17 +21,17 @@ namespace xin::redis {
 
 class Database {
 public:
-    using KeyType = std::string;
-    using StringType = std::string;
-    using StringPtr = std::shared_ptr<StringType>;
-    using HashType = std::unordered_map<KeyType, StringPtr>;
-    using HashPtr = std::shared_ptr<HashType>;
-    using ListType = std::list<StringPtr>;
-    using ListPtr = std::shared_ptr<ListType>;
-    using SortedSetType = SortedSet;
-    using SortedSetPtr = std::shared_ptr<SortedSetType>;
-    using ValueType = std::variant<StringPtr, HashPtr, ListPtr, SortedSetPtr>;
-    using SizeType = std::size_t;
+    using Key = std::string;
+    using String = std::string;
+    using StringPtr = std::shared_ptr<String>;
+    using Hash = std::unordered_map<Key, StringPtr>;
+    using HashPtr = std::shared_ptr<Hash>;
+    using List = std::list<StringPtr>;
+    using ListPtr = std::shared_ptr<List>;
+    using SortedSet = SortedSet;
+    using SortedSetPtr = std::shared_ptr<SortedSet>;
+    using Value = std::variant<StringPtr, HashPtr, ListPtr, SortedSetPtr>;
+    using Size = std::size_t;
     using Seconds = std::uint64_t;
 
     template<typename T>
@@ -41,7 +41,7 @@ public:
 
     template<typename Value>
         requires is_valid_value<Value>
-    void set(const KeyType& key, Value value)
+    void set(const Key& key, Value value)
     {
         erase_expire(key);
 
@@ -50,7 +50,7 @@ public:
 
     template<typename Value>
         requires is_valid_value<Value>
-    void set(const KeyType& key, Value value, Seconds expire_seconds)
+    void set(const Key& key, Value value, Seconds expire_seconds)
     {
         erase_expire(key);
         auto [it, _] = data_.insert_or_assign(key, std::move(value));
@@ -61,7 +61,7 @@ public:
 
     template<typename Value>
         requires is_valid_value<Value>
-    auto get_if(const KeyType& key) -> std::optional<Value>
+    auto get_if(const Key& key) -> std::optional<Value>
     {
         if (erase_if_expired(key))
             return {};
@@ -73,14 +73,14 @@ public:
         return {};
     }
 
-    auto get(const KeyType& key) -> std::optional<ValueType>;
+    auto get(const Key& key) -> std::optional<Value>;
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
-                 std::same_as<std::ranges::range_value_t<Range>, KeyType>
-    auto keys(Range&& keys) -> std::vector<KeyType>
+                 std::same_as<std::ranges::range_value_t<Range>, Key>
+    auto keys(Range&& keys) -> std::vector<Key>
     {
-        std::vector<KeyType> result{};
+        std::vector<Key> result{};
         for (const auto& key : keys) {
             if (contains(key))
                 result.push_back(key);
@@ -90,7 +90,7 @@ public:
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
-                 std::same_as<std::ranges::range_value_t<Range>, KeyType>
+                 std::same_as<std::ranges::range_value_t<Range>, Key>
     auto mget(Range&& keys) -> std::vector<StringPtr>
     {
         std::vector<StringPtr> result{};
@@ -105,7 +105,7 @@ public:
 
     template<typename Range>
         requires std::ranges::input_range<Range> &&
-                 std::same_as<std::ranges::range_value_t<Range>, KeyType>
+                 std::same_as<std::ranges::range_value_t<Range>, Key>
     auto erase(Range&& keys) -> int
     {
         int count = 0;
@@ -124,22 +124,22 @@ public:
         return count;
     }
 
-    auto expire_at(const KeyType& key, Seconds seconds) -> bool;
+    auto expire_at(const Key& key, Seconds seconds) -> bool;
     // time to live
-    auto ttl(const KeyType& key) -> std::optional<Seconds>;
+    auto ttl(const Key& key) -> std::optional<Seconds>;
 
-    auto contains(const KeyType& key) -> bool;
+    auto contains(const Key& key) -> bool;
 
     void flush();
 
     void flush_async();
 
-    auto persist(const KeyType& key) -> bool;
+    auto persist(const Key& key) -> bool;
 
     auto expired_keys() -> std::vector<std::string>;
 
     [[nodiscard]]
-    constexpr auto size() const noexcept -> SizeType
+    constexpr auto size() const noexcept -> Size
     {
         return data_.size();
     }
@@ -147,7 +147,7 @@ public:
 private:
     using Clock = std::chrono::steady_clock;
     using TimeUnit = std::chrono::milliseconds;
-    using Datas = std::unordered_map<KeyType, ValueType>;
+    using Datas = std::unordered_map<Key, Value>;
     using Expires = std::set<std::pair<Seconds, std::string_view>>;
 
     Datas data_;
@@ -155,7 +155,7 @@ private:
 
     static auto now() -> Seconds;
 
-    auto erase_if_expired(const KeyType& key) -> bool;
+    auto erase_if_expired(const Key& key) -> bool;
 
     auto find_expire_time(std::string_view key) -> Expires::iterator;
 
