@@ -1,6 +1,8 @@
 #ifndef XIN_REDIS_APPLICATION_CONTEXT_H
 #define XIN_REDIS_APPLICATION_CONTEXT_H
 
+#include <asio.hpp>
+#include <asio/io_context.hpp>
 #include <base_aof_logger.h>
 #include <redis_storage.h>
 
@@ -23,7 +25,7 @@ struct application_context {
 
     static Port port;
 
-    static std::array<Database, application_context::DB_COUNT> databases;
+    static std::array<Database, DB_COUNT> databases;
 
     static base::AOFLogger aof_logger;
 

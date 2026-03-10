@@ -33,7 +33,7 @@ TEST_SUITE("redis-serialization-protocol")
         auto partial_result = parser.parse(partial_buf);
 
         REQUIRE_FALSE(partial_result.has_value());
-        CHECK(partial_result.error() == RESPParser::Error::Waiting);
+        CHECK(partial_result.error() == Status::Waiting);
         CHECK(partial_buf.empty());
 
         constexpr std::string_view remain = "key\r\n";
@@ -56,7 +56,7 @@ TEST_SUITE("redis-serialization-protocol")
         auto result = parser.parse(buf);
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == RESPParser::Error::Error);
+        CHECK(result.error() == Status::Error);
     }
 
     TEST_CASE("RESPParser在bulk数据后缀非CRLF时返回Error")
@@ -68,7 +68,7 @@ TEST_SUITE("redis-serialization-protocol")
         auto result = parser.parse(buf);
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error() == RESPParser::Error::Error);
+        CHECK(result.error() == Status::Error);
     }
 
     TEST_CASE("RESPParser reset后可复用解析下一条命令")

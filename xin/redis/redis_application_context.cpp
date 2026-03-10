@@ -45,7 +45,7 @@ auto application_context::load_aof() -> std::size_t
             ++succeed_count;
             parser.reset();
         }
-        else if (result.error() == RESPParser::Error::Waiting) {
+        else if (result.error() == Status::Waiting) {
             base::log::warning("AOF: 文件末尾有不完整的命令，已忽略");
             ++failed_count;
             break;

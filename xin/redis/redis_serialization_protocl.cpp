@@ -5,12 +5,13 @@
 #include <algorithm>
 #include <charconv>
 #include <expected>
-#include <optional>
 #include <span>
 
 namespace {
 
-constexpr std::string_view CRLF = "\r\n";
+using namespace xin::redis;
+
+constexpr std::string_view FOOTER = "\r\n";
 
 // RESP 协议中，数组以 '*' 开头，后跟元素数量，每个元素以 '$' 开头，后跟元素长度和数据
 // 但是客户端永远以数组形式发送命令，所以我们只需要处理数组和 bulk string 两种类型即可
@@ -21,24 +22,24 @@ constexpr char SIMPLE_STRING_PREFIX = '+';
 constexpr char ERROR_PREFIX = '-';
 constexpr char INTEGER_PREFIX = ':';
 
-auto read_integral(std::span<const char>& buf) -> std::optional<long>
+auto read_integral(std::span<const char>& buf) -> std::expected<long, Status>
 {
-    auto match = std::ranges::search(buf, CRLF);
+    auto match = std::ranges::search(buf, FOOTER);
     if (match.begin() == buf.end())
-        return {};
+        return std::unexpected(Status::Waiting);
 
     auto line_len = static_cast<std::size_t>(match.begin() - buf.begin());
     if (line_len == 0)
-        return {};
+        return std::unexpected(Status::Error);
 
     long value = 0;
     const char* first = buf.data();
     const char* last = first + line_len;
     auto [ptr, ec] = std::from_chars(first, last, value);
     if (ec != std::errc{} || ptr != last)
-        return {};
+        return std::unexpected(Status::Error);
 
-    buf = buf.subspan(line_len + CRLF.size());
+    buf = buf.subspan(line_len + FOOTER.size());
     return value;
 }
 
@@ -46,7 +47,7 @@ auto read_integral(std::span<const char>& buf) -> std::optional<long>
 
 namespace xin::redis {
 
-auto RESPParser::parse(std::span<const char>& buf) -> std::expected<arguments, Error>
+auto RESPParser::parse(std::span<const char>& buf) -> std::expected<arguments, Status>
 {
     while (!buf.empty()) {
         switch (state_) {
@@ -83,24 +84,24 @@ auto RESPParser::parse(std::span<const char>& buf) -> std::expected<arguments, E
         }
     }
 
-    return std::unexpected(Error::Waiting);
+    return std::unexpected(Status::Waiting);
 }
 
-auto RESPParser::read_start(std::span<const char>& buf) -> std::expected<void, Error>
+auto RESPParser::read_start(std::span<const char>& buf) -> std::expected<void, Status>
 {
     if (buf.front() != ARRAY_PREFIX)
-        return std::unexpected(Error::Error);
+        return std::unexpected(Status::Error);
 
     buf = buf.subspan(1);
     state_ = State::ReadingArraySize;
     return {};
 }
 
-auto RESPParser::read_array_size(std::span<const char>& buf) -> std::expected<void, Error>
+auto RESPParser::read_array_size(std::span<const char>& buf) -> std::expected<void, Status>
 {
     auto len = read_integral(buf);
     if (!len)
-        return std::unexpected(Error::Error);
+        return std::unexpected(len.error());
 
     expected_args_count_ = *len;
     args_.reserve(expected_args_count_);
@@ -108,10 +109,10 @@ auto RESPParser::read_array_size(std::span<const char>& buf) -> std::expected<vo
     return {};
 }
 
-auto RESPParser::read_bulk_prefix(std::span<const char>& buf) -> std::expected<void, Error>
+auto RESPParser::read_bulk_prefix(std::span<const char>& buf) -> std::expected<void, Status>
 {
     if (buf.front() != BULK_STRING_PREFIX)
-        return std::unexpected(Error::Error);
+        return std::unexpected(Status::Error);
 
     buf = buf.subspan(1);
     state_ = State::ReadingBulkSize;
@@ -119,25 +120,25 @@ auto RESPParser::read_bulk_prefix(std::span<const char>& buf) -> std::expected<v
     return {};
 }
 
-auto RESPParser::read_bulk_size(std::span<const char>& buf) -> std::expected<void, Error>
+auto RESPParser::read_bulk_size(std::span<const char>& buf) -> std::expected<void, Status>
 {
     auto len = read_integral(buf);
     if (!len)
-        return std::unexpected(Error::Waiting);
+        return std::unexpected(len.error());
 
     current_arg_length_ = *len;
     state_ = State::ReadingBulkData;
     return {};
 }
 
-auto RESPParser::parse_reading_bulk_data(std::span<const char>& buf) -> std::expected<void, Error>
+auto RESPParser::parse_reading_bulk_data(std::span<const char>& buf) -> std::expected<void, Status>
 {
-    std::size_t line_size = current_arg_length_ + CRLF.size();
+    std::size_t line_size = current_arg_length_ + FOOTER.size();
     if (buf.size() < line_size)
-        return std::unexpected(Error::Waiting);
+        return std::unexpected(Status::Waiting);
 
-    if (std::string_view{ &buf[current_arg_length_], 2 } != CRLF)
-        return std::unexpected(Error::Error);
+    if (std::string_view{ &buf[current_arg_length_], 2 } != FOOTER)
+        return std::unexpected(Status::Error);
 
     args_.emplace_back(buf.data(), current_arg_length_);
     buf = buf.subspan(line_size);

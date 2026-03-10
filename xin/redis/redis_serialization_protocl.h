@@ -9,18 +9,18 @@
 
 namespace xin::redis {
 
+enum class Status : std::uint8_t {
+    Waiting, // 数据不够，等待更多数据
+    Error    // 解析错误
+};
+
 // 这是一个 RESP 协议解析器，设计为状态机，支持增量解析。
 // 需要手动重置状态以解析下一条命令。
 class RESPParser {
 public:
     using arguments = std::vector<std::string>;
 
-    enum class Error : std::uint8_t {
-        Waiting, // 数据不够，等待更多数据
-        Error    // 解析错误
-    };
-
-    auto parse(std::span<const char>& buf) -> std::expected<arguments, Error>;
+    auto parse(std::span<const char>& buf) -> std::expected<arguments, Status>;
 
     void reset();
 
@@ -38,15 +38,15 @@ private:
     int current_arg_length_ = 0;
     arguments args_;
 
-    auto read_start(std::span<const char>& buf) -> std::expected<void, Error>;
+    auto read_start(std::span<const char>& buf) -> std::expected<void, Status>;
 
-    auto read_array_size(std::span<const char>& buf) -> std::expected<void, Error>;
+    auto read_array_size(std::span<const char>& buf) -> std::expected<void, Status>;
 
-    auto read_bulk_prefix(std::span<const char>& buf) -> std::expected<void, Error>;
+    auto read_bulk_prefix(std::span<const char>& buf) -> std::expected<void, Status>;
 
-    auto read_bulk_size(std::span<const char>& buf) -> std::expected<void, Error>;
+    auto read_bulk_size(std::span<const char>& buf) -> std::expected<void, Status>;
 
-    auto parse_reading_bulk_data(std::span<const char>& buf) -> std::expected<void, Error>;
+    auto parse_reading_bulk_data(std::span<const char>& buf) -> std::expected<void, Status>;
 };
 
 struct resp {

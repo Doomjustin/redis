@@ -1,23 +1,26 @@
 #include "redis_session.h"
 
+#include <asio/dispatch.hpp>
+#include <asio/use_awaitable.hpp>
 #include <base_log.h>
+#include <redis_application_context.h>
 #include <redis_command.h>
 
-using namespace asio;
 using namespace xin::base;
 
 namespace xin::redis {
 
-Session::Session(asio::ip::tcp::socket socket)
+Session::Session(asio::ip::tcp::socket socket, asio::strand<asio::any_io_executor> strand)
     : socket_{ std::move(socket) }
+    , strand_{ std::move(strand) }
 {
 }
 
-auto Session::start() -> asio::awaitable<void>
+auto Session::run() -> asio::awaitable<void>
 {
     while (true) {
         auto socket_buffer = asio::buffer(buffer_.data() + write_idx_, buffer_.size() - write_idx_);
-        auto n = co_await socket_.async_read_some(socket_buffer, use_awaitable);
+        auto n = co_await socket_.async_read_some(socket_buffer, asio::use_awaitable);
 
         auto total_len = write_idx_ + n;
         std::span<const char> buffer_view{ buffer_.data(), total_len };
@@ -28,6 +31,7 @@ auto Session::start() -> asio::awaitable<void>
             if (res) {
                 log::debug("Command: {}", res->at(0));
 
+                co_await asio::dispatch(strand_, asio::use_awaitable);
                 auto response = commands::dispatch(index_, *res);
                 responses.push_back(std::move(response));
 
@@ -37,7 +41,7 @@ auto Session::start() -> asio::awaitable<void>
                     break;
                 }
             }
-            else if (res.error() == RESPParser::Error::Waiting) {
+            else if (res.error() == Status::Waiting) {
                 if (!buffer_view.empty()) {
                     std::memmove(buffer_.data(), buffer_view.data(), buffer_view.size());
                     write_idx_ = buffer_view.size();
@@ -59,7 +63,7 @@ auto Session::start() -> asio::awaitable<void>
                 response_buffers.insert(response_buffers.end(), buffers.begin(), buffers.end());
             }
 
-            co_await asio::async_write(socket_, response_buffers, use_awaitable);
+            co_await asio::async_write(socket_, response_buffers, asio::use_awaitable);
             responses.clear();
         }
     }

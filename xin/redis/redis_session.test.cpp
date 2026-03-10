@@ -1,7 +1,9 @@
 #include "redis_session.h"
 
 #include <asio.hpp>
+#include <asio/strand.hpp>
 #include <doctest/doctest.h>
+#include <redis_application_context.h>
 
 #include <array>
 #include <thread>
@@ -13,6 +15,7 @@ TEST_SUITE("redis-session")
     TEST_CASE("session handles ping command")
     {
         asio::io_context context{ 1 };
+        asio::strand<asio::any_io_executor> strand{ context.get_executor() };
         tcp::acceptor acceptor{ context, tcp::endpoint(tcp::v4(), 0) };
 
         auto endpoint =
@@ -21,14 +24,13 @@ TEST_SUITE("redis-session")
         tcp::socket client{ context };
         client.connect(endpoint);
         tcp::socket server_socket = acceptor.accept();
-
         asio::co_spawn(
             context,
-            [socket = std::move(server_socket)]() mutable -> asio::awaitable<void> {
-                xin::redis::Session session{ std::move(socket) };
+            [socket = std::move(server_socket), strand]() mutable -> asio::awaitable<void> {
+                xin::redis::Session session{ std::move(socket), strand };
 
                 try {
-                    co_await session.start();
+                    co_await session.run();
                 }
                 catch (...) {
                 }
