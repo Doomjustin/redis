@@ -11,6 +11,67 @@
 - AOF 追加写入与启动重放
 - `doctest` + `ctest` 测试体系
 
+## 当前压力测试
+我在xin-doom.duckdns.org:16379放了我的release版本，以下结果使用手机热点的网络测试
+```bash
+redis-benchmark -h xin-doom.duckdns.org -p 16379 -t set -n 10000 -c 50
+
+Summary:
+  throughput summary: 686.29 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+       72.234    33.664    66.175   109.567   179.839   693.759
+```
+
+```bash
+redis-benchmark -h xin-doom.duckdns.org -p 16379 -t set -n 10000 -c 50 -P 100
+Summary:
+  throughput summary: 5733.95 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+      326.397    54.976   215.423  1126.399  1160.191  1205.247
+```
+
+```bash
+redis-benchmark -h xin-doom.duckdns.org -p 16379 -t set -n 100000 -c 50 -P 100
+Summary:
+  throughput summary: 20584.60 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+      179.219    57.248   170.879   270.591   327.935   378.367
+```
+
+本地测试
+```bash
+redis-benchmark -h 127.0.0.1 -p 16379 -t set,get -n 1000000 -c 50 -P 100
+
+====== SET ======
+  1000000 requests completed in 8.19 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+  multi-thread: no
+
+Summary:
+  throughput summary: 122040.52 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        0.296     0.056     0.255     0.583     1.247     2.943
+
+====== GET ======
+  1000000 requests completed in 8.19 seconds
+  50 parallel clients
+  3 bytes payload
+  keep alive: 1
+  multi-thread: no
+
+Summary:
+  throughput summary: 122100.12 requests per second
+  latency summary (msec):
+          avg       min       p50       p95       p99       max
+        0.250     0.048     0.215     0.511     0.847     2.431
+```
+
 ## 快速开始
 
 ### 1. 环境要求
@@ -31,9 +92,35 @@
 
 ### 2. 配置与编译
 
+先准备 `vcpkg`（若你已有可跳过）：
+
 ```bash
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
+git clone https://github.com/microsoft/vcpkg.git
+./vcpkg/bootstrap-vcpkg.sh
+```
+
+建议设置：
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+```
+
+Debug 构建：
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+  -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
+```
+
+Release 构建：
+
+```bash
+cmake -S . -B build-release \
+  -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release
 ```
 
 主要产物：
@@ -50,6 +137,8 @@ cmake --build build
 ./build/app/xin-redis-server
 ```
 
+建议在仓库根目录启动（当前实现将 AOF 固定写到当前工作目录下的 `appendonly.aof`）。
+
 连接测试：
 
 ```bash
@@ -57,6 +146,18 @@ redis-cli -p 16379
 ```
 
 说明：`app/redis_app_client.cpp` 目前是占位实现，建议使用 `redis-cli`。
+
+### 4. 快速验收（5 条命令）
+
+```bash
+redis-cli -p 16379 PING
+redis-cli -p 16379 SET k v EX 10
+redis-cli -p 16379 GET k
+redis-cli -p 16379 TTL k
+redis-cli -p 16379 ZADD z 1 a 2 b
+```
+
+如果以上都返回预期（`PONG`、`OK`、`v`、正整数 TTL、`:2`），说明核心链路可用。
 
 ## 当前命令支持
 
@@ -106,9 +207,9 @@ redis-cli -p 16379
 `WRONGTYPE Operation against a key holding the wrong kind of value`
 - `GET/HGET/LPOP` 未命中返回 Null Bulk String（`$-1\r\n`）。
 - `MGET/KEYS/HGETALL/LRANGE/ZRANGE` 返回 RESP Array。
-- `TTL` 行为：
-- key 不存在时返回 `-2`
-- key 存在但无过期时间时返回 `-1`
+- `TTL` 行为：key 不存在返回 `-2`；key 存在但无过期时间返回 `-1`。
+- `FLUSHDB` 默认等价于 `FLUSHDB SYNC`。
+- `EXPIRE` 的 seconds 需为非负整数，否则返回 `ERR value is not an integer or out of range`。
 
 ## 持久化（AOF）
 
@@ -118,6 +219,11 @@ redis-cli -p 16379
 - 当写命令所属 DB 发生变化时，会先写入 `SELECT <index>`，再写对应写命令，保证多 DB 语义可重放。
 - AOF 后台线程按容量阈值或定时（约 1s）刷盘。
 - 重放期间会关闭二次写入，避免 AOF 自我追加。
+
+补充说明：
+
+- AOF 重放在服务监听端口之前完成，重放失败会在日志中给出告警。
+- 若 AOF 文件末尾存在不完整 RESP 命令，当前策略是忽略尾部残缺片段并继续启动。
 
 当前实现约束：
 
@@ -166,6 +272,13 @@ ctest --test-dir build --output-on-failure
 
 测试入口定义在 `xin/unit_test.cpp`，具体用例分布在 `xin/base/*.test.cpp` 与 `xin/redis/*.test.cpp`。
 
+如果你使用的是 Release 构建目录，命令改为：
+
+```bash
+ctest --test-dir build-release --output-on-failure
+./build-release/xin/xin.test
+```
+
 ## 目录结构
 
 ```text
@@ -180,6 +293,24 @@ cmake/       # CMake 辅助脚本
 - 不是完整 Redis 实现，功能范围聚焦核心命令。
 - `KEYS` 目前是“输入 key 列表过滤存在项”，不是通配符模式匹配语义。
 - 未实现事务、发布订阅、Lua、ACL、集群等特性。
+- 服务端端口当前在 `app/redis_app_server.cpp` 中写死为 `16379`，尚未提供命令行/配置文件改端口能力。
+
+## 常见问题
+
+### 1. `Could not find ...`（依赖找不到）
+
+- 确认 `-DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake` 已传入。
+- 确认 `vcpkg.json` 依赖已经在当前 triplet 下安装完成。
+
+### 2. 启动后数据没有持久化
+
+- 检查服务端启动目录；AOF 文件写入路径与当前工作目录相关。
+- 确认进程对当前目录有写权限。
+
+### 3. `redis-cli` 连不上
+
+- 确认服务端进程已启动且监听 `16379`。
+- 若在远程机器，检查防火墙与端口映射。
 
 ## 开发路线建议
 
