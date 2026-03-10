@@ -7,7 +7,7 @@
 
 namespace {
 
-auto aligned_size(xin::redis::allocator::size_type size) -> xin::redis::allocator::size_type
+auto aligned_size(xin::redis::allocator::SizeType size) -> xin::redis::allocator::SizeType
 {
     if (size & (sizeof(long) - 1))
         size += sizeof(long) - (size & (sizeof(long) - 1));

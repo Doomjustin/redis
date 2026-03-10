@@ -50,7 +50,7 @@ out/
 
 # customer
 **/config.cppm
-
+sample/
 external/
 
 *.aof

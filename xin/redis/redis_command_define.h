@@ -10,7 +10,7 @@ namespace xin::redis {
 
 using Arguments = RESPParser::arguments;
 using ResponsePtr = std::unique_ptr<Response>;
-using Handler = std::function<ResponsePtr(std::size_t, const Arguments&)>;
+using Handler = std::function<ResponsePtr(Database&, const Arguments&)>;
 using StringType = Database::StringType;
 using StringPtr = Database::StringPtr;
 using HashType = Database::HashType;

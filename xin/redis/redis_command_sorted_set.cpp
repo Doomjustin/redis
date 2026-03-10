@@ -18,7 +18,7 @@ using namespace xin::redis;
 using SortedSet = Database::SortedSetType;
 using SortedSetPtr = Database::SortedSetPtr;
 
-auto create_new_sorted_set(std::size_t index, const Arguments& args) -> ResponsePtr
+auto create_new_sorted_set(Database& db, const Arguments& args) -> ResponsePtr
 {
     auto sorted_set = std::make_shared<SortedSet>();
 
@@ -34,7 +34,7 @@ auto create_new_sorted_set(std::size_t index, const Arguments& args) -> Response
             ++new_elements;
     }
 
-    application_context::db(index).set(args[1], std::move(sorted_set));
+    db.set(args[1], std::move(sorted_set));
 
     log::debug("ZADD command executed with key: {}, created new sorted set, added {} new elements",
                args[1], new_elements);
@@ -63,9 +63,9 @@ auto add_to_existing_sorted_set(const Arguments& args, SortedSet& sorted_set) ->
     return std::make_unique<IntegralResponse>(new_elements);
 }
 
-auto range(std::size_t index, const Arguments& args, bool with_scores) -> ResponsePtr
+auto range(Database& db, const Arguments& args, bool with_scores) -> ResponsePtr
 {
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info("ZRANGE command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<ArrayResponse>();
@@ -113,19 +113,19 @@ auto range(std::size_t index, const Arguments& args, bool with_scores) -> Respon
 
 namespace xin::redis {
 
-auto sorted_set_commands::add(std::size_t index, const Arguments& args) -> ResponsePtr
+auto sorted_set_commands::add(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 4 || args.size() % 2 != 0) {
         log::error("ZADD command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("zadd"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info(
             "ZADD command executed with key: {}, but key does not exist, creating new sorted set",
             args[1]);
-        return create_new_sorted_set(index, args);
+        return create_new_sorted_set(db, args);
     }
 
     if (auto* sorted_set = std::get_if<SortedSetPtr>(&*res))
@@ -137,7 +137,7 @@ auto sorted_set_commands::add(std::size_t index, const Arguments& args) -> Respo
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
-auto sorted_set_commands::range(std::size_t index, const Arguments& args) -> ResponsePtr
+auto sorted_set_commands::range(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 5 && strings::to_lowercase(args[4]) != "withscores") {
         log::info("ZRANGE command received invalid option: {}", args[4]);
@@ -145,10 +145,10 @@ auto sorted_set_commands::range(std::size_t index, const Arguments& args) -> Res
     }
 
     if (args.size() == 4)
-        return ::range(index, args, false);
+        return ::range(db, args, false);
 
     if (args.size() == 5 && strings::to_lowercase(args[4]) == "withscores")
-        return ::range(index, args, true);
+        return ::range(db, args, true);
 
     return std::make_unique<ErrorResponse>(arguments_size_error("zrange"));
 }

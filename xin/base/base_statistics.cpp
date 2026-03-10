@@ -8,7 +8,7 @@
 
 namespace xin::base {
 
-statistics::error_handler statistics::error_handler_ = nullptr;
+statistics::ErrorHandler statistics::error_handler_ = nullptr;
 
 std::atomic<std::size_t> statistics::peak_used_memory_{ 0 };
 
@@ -22,7 +22,7 @@ void statistics::oom_handler()
     }
 }
 
-void statistics::on_error(error_handler handler)
+void statistics::on_error(ErrorHandler handler)
 {
     error_handler_ = std::move(handler);
     std::set_new_handler(oom_handler);

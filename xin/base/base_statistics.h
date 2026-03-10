@@ -9,11 +9,11 @@
 namespace xin::base {
 
 struct statistics {
-    using error_handler = std::function<void()>;
+    using ErrorHandler = std::function<void()>;
 
     statistics() = delete;
 
-    static void on_error(error_handler handler);
+    static void on_error(ErrorHandler handler);
 
     static auto used_memory() -> std::size_t;
 
@@ -22,7 +22,7 @@ struct statistics {
     static auto allocator_info() -> std::string;
 
 private:
-    static error_handler error_handler_;
+    static ErrorHandler error_handler_;
     static std::atomic<std::size_t> peak_used_memory_;
 
     static void oom_handler();

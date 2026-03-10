@@ -8,19 +8,17 @@
 
 namespace xin::base {
 
-template<typename Key, typename Value, typename Alloc = std::allocator<char>>
+template<typename Key, typename Value>
 class LRUCache {
 private:
     struct Node;
 
 public:
-    using allocator_type = std::allocator_traits<Alloc>::template rebind_alloc<Node>;
-    using allocator_traits = std::allocator_traits<allocator_type>;
-    using key_type = Key;
-    using value_type = Value;
-    using size_type = std::size_t;
+    using KeyType = Key;
+    using ValueType = Value;
+    using SizeType = std::size_t;
 
-    LRUCache(size_type capacity)
+    LRUCache(SizeType capacity)
         : capacity_{ capacity }
     {
         head_->next = tail_.get();
@@ -35,7 +33,7 @@ public:
 
     ~LRUCache() = default;
 
-    auto get(const key_type& key) noexcept -> std::optional<value_type>
+    auto get(const KeyType& key) noexcept -> std::optional<ValueType>
     {
         if (!cache_.contains(key))
             return {};
@@ -45,7 +43,7 @@ public:
         return node->value;
     }
 
-    void put(key_type key, value_type value)
+    void put(KeyType key, ValueType value)
     {
         if (cache_.contains(key)) {
             auto node = cache_[key].get();
@@ -65,23 +63,22 @@ public:
     }
 
     [[nodiscard]]
-    constexpr auto size() const noexcept -> size_type
+    constexpr auto size() const noexcept -> SizeType
     {
         return cache_.size();
     }
 
     [[nodiscard]]
-    constexpr auto capacity() const noexcept -> size_type
+    constexpr auto capacity() const noexcept -> SizeType
     {
         return capacity_;
     }
 
 private:
-    size_type capacity_ = 0;
+    SizeType capacity_ = 0;
     std::unique_ptr<Node> head_ = std::make_unique<Node>();
     std::unique_ptr<Node> tail_ = std::make_unique<Node>();
-    allocator_type allocator_;
-    std::unordered_map<key_type, std::unique_ptr<Node>> cache_;
+    std::unordered_map<KeyType, std::unique_ptr<Node>> cache_;
 
     void add_to_head(Node* node)
     {
@@ -111,8 +108,8 @@ private:
     }
 };
 
-template<typename Key, typename Value, typename Alloc>
-struct LRUCache<Key, Value, Alloc>::Node {
+template<typename Key, typename Value>
+struct LRUCache<Key, Value>::Node {
     Key key;
     Value value;
     Node* prev = nullptr;

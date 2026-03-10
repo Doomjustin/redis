@@ -11,7 +11,7 @@ namespace {
 
 using namespace xin::redis;
 
-auto create_new_list(std::size_t index, const Arguments& args) -> ResponsePtr
+auto create_new_list(Database& db, const Arguments& args) -> ResponsePtr
 {
     log::debug("LPUSH command executed with key: {}, but key does not exist, creating new list",
                args[1]);
@@ -20,7 +20,7 @@ auto create_new_list(std::size_t index, const Arguments& args) -> ResponsePtr
     for (size_t i = 2; i < args.size(); ++i)
         list->push_front(std::make_shared<std::string>(args[i]));
 
-    application_context::db(index).set(args[1], std::move(list));
+    db.set(args[1], std::move(list));
 
     return std::make_unique<IntegralResponse>(args.size() - 2);
 }
@@ -39,16 +39,16 @@ auto add_to_existing_list(const Arguments& args, ListType& container) -> Respons
 
 namespace xin::redis {
 
-auto list_commands::push(std::size_t index, const Arguments& args) -> ResponsePtr
+auto list_commands::push(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 3) {
         log::info("LPUSH command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("lpush"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res)
-        return create_new_list(index, args);
+        return create_new_list(db, args);
 
     if (auto* list = std::get_if<ListPtr>(&*res))
         return add_to_existing_list(args, **list);
@@ -59,14 +59,14 @@ auto list_commands::push(std::size_t index, const Arguments& args) -> ResponsePt
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
-auto list_commands::pop(std::size_t index, const Arguments& args) -> ResponsePtr
+auto list_commands::pop(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
         log::info("LPOP command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("lpop"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info("LPOP command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<NullBulkStringResponse>();
@@ -93,14 +93,14 @@ auto list_commands::pop(std::size_t index, const Arguments& args) -> ResponsePtr
     return std::make_unique<ErrorResponse>(WRONG_TYPE_ERR);
 }
 
-auto list_commands::range(std::size_t index, const Arguments& args) -> ResponsePtr
+auto list_commands::range(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 4) {
         log::info("LRANGE command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("lrange"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info("LRANGE command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<ArrayResponse>();

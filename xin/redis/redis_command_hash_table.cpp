@@ -1,5 +1,7 @@
 #include "redis_command_hash_table.h"
 
+#include "redis_storage.h"
+
 #include <base_log.h>
 #include <redis_application_context.h>
 
@@ -9,7 +11,7 @@ namespace {
 
 using namespace xin::redis;
 
-auto create_new_hash(std::size_t index, const Arguments& args) -> ResponsePtr
+auto create_new_hash(Database& db, const Arguments& args) -> ResponsePtr
 {
     log::debug("HSET command executed with key: {}, but key does not exist, creating new hash",
                args[1]);
@@ -24,7 +26,7 @@ auto create_new_hash(std::size_t index, const Arguments& args) -> ResponsePtr
             ++new_fields;
     }
 
-    application_context::db(index).set(args[1], std::move(hash));
+    db.set(args[1], std::move(hash));
 
     return std::make_unique<IntegralResponse>(new_fields);
 }
@@ -78,18 +80,18 @@ auto get_all_from_hash(const Arguments& args, HashType& container) -> ResponsePt
 
 namespace xin::redis {
 
-auto hash_table_commands::set(std::size_t index, const Arguments& args) -> ResponsePtr
+auto hash_table_commands::set(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() < 4 || args.size() % 2 != 0) {
         log::info("HSET command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("hset"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
 
     // 如果key不存在，那么就创建一个新的hash对象并插入字段值对
     if (!res)
-        return create_new_hash(index, args);
+        return create_new_hash(db, args);
 
     // 如果key存在且是hash类型，那么就更新hash中的字段值对
     if (auto* hash = std::get_if<HashPtr>(&*res))
@@ -103,14 +105,14 @@ auto hash_table_commands::set(std::size_t index, const Arguments& args) -> Respo
         "WRONGTYPE Operation against a key holding the wrong kind of value");
 }
 
-auto hash_table_commands::get(std::size_t index, const Arguments& args) -> ResponsePtr
+auto hash_table_commands::get(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 3) {
         log::info("HGET command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("hget"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info("HGET command executed with key: {}, field: {}, but key does not exist", args[1],
                   args[2]);
@@ -127,14 +129,14 @@ auto hash_table_commands::get(std::size_t index, const Arguments& args) -> Respo
         "WRONGTYPE Operation against a key holding the wrong kind of value");
 }
 
-auto hash_table_commands::get_all(std::size_t index, const Arguments& args) -> ResponsePtr
+auto hash_table_commands::get_all(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
         log::info("HGETALL command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("hgetall"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info("HGETALL command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<ArrayResponse>();

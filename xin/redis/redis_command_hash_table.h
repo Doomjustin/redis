@@ -1,6 +1,8 @@
 #ifndef XIN_REDIS_COMMAND_HASH_TABLE_H
 #define XIN_REDIS_COMMAND_HASH_TABLE_H
 
+#include "redis_storage.h"
+
 #include <redis_command_define.h>
 
 namespace xin::redis {
@@ -17,7 +19,7 @@ struct hash_table_commands {
     // The command returns the number of fields that were added to the hash, not including fields
     // that were overwritten. If the command is called with an odd number of arguments, or if the
     // number of arguments is less than 4, an error is returned.
-    static auto set(std::size_t index, const Arguments& args) -> ResponsePtr;
+    static auto set(Database& db, const Arguments& args) -> ResponsePtr;
 
     // hget key field
     // If the key does not exist, it returns a Null Bulk String.
@@ -25,7 +27,7 @@ struct hash_table_commands {
     // If the key exists and holds a hash value, but the specified field does not exist in the hash,
     // it returns a Null Bulk String. If the key exists and holds a hash value, and the specified
     // field exists in the hash, it returns the value associated with the specified field.
-    static auto get(std::size_t index, const Arguments& args) -> ResponsePtr;
+    static auto get(Database& db, const Arguments& args) -> ResponsePtr;
 
     // hgetall key
     // If the key does not exist, it returns an empty list.
@@ -34,7 +36,7 @@ struct hash_table_commands {
     // values stored in the hash, in the form of a list where every field name is followed by its
     // value. Because of this, the number of elements in the returned list is twice the number of
     // fields in the hash.
-    static auto get_all(std::size_t index, const Arguments& args) -> ResponsePtr;
+    static auto get_all(Database& db, const Arguments& args) -> ResponsePtr;
 };
 
 } // namespace xin::redis

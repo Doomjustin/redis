@@ -8,45 +8,45 @@ using namespace xin::base;
 
 namespace xin::redis {
 
-auto set_with_expiry(std::size_t index, const Arguments& args) -> ResponsePtr
+auto set_with_expiry(Database& db, const Arguments& args) -> ResponsePtr
 {
     auto expiry = numeric_cast<std::uint64_t>(args[4]);
     if (!expiry)
         return std::make_unique<ErrorResponse>(INVALID_INTEGRAL_ERR);
 
-    application_context::db(index).set(args[1], std::make_shared<std::string>(args[2]), *expiry);
+    db.set(args[1], std::make_shared<std::string>(args[2]), *expiry);
     log::debug("SET command with expiry executed with key: {}, value: {}, expire time: {} seconds",
                args[1], args[2], *expiry);
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
-auto set_persist(std::size_t index, const Arguments& args) -> ResponsePtr
+auto set_persist(Database& db, const Arguments& args) -> ResponsePtr
 {
-    application_context::db(index).set(args[1], std::make_shared<std::string>(args[2]));
+    db.set(args[1], std::make_shared<std::string>(args[2]));
     log::debug("SET command executed with key: {} and value: {}", args[1], args[2]);
     return std::make_unique<SimpleStringResponse>("OK");
 }
 
-auto string_commands::set(std::size_t index, const Arguments& args) -> ResponsePtr
+auto string_commands::set(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() == 3)
-        return set_persist(index, args);
+        return set_persist(db, args);
 
     if (args.size() == 5 && strings::to_lowercase(args[3]) == "ex")
-        return set_with_expiry(index, args);
+        return set_with_expiry(db, args);
 
     log::info("SET command received wrong number of arguments or invalid option: {}", args);
     return std::make_unique<ErrorResponse>(arguments_size_error("set"));
 }
 
-auto string_commands::get(std::size_t index, const Arguments& args) -> ResponsePtr
+auto string_commands::get(Database& db, const Arguments& args) -> ResponsePtr
 {
     if (args.size() != 2) {
         log::info("GET command received wrong number of arguments: {}", args);
         return std::make_unique<ErrorResponse>(arguments_size_error("get"));
     }
 
-    auto res = application_context::db(index).get(args[1]);
+    auto res = db.get(args[1]);
     if (!res) {
         log::info("GET command executed with key: {}, but key does not exist", args[1]);
         return std::make_unique<NullBulkStringResponse>();

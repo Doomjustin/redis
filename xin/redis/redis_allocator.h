@@ -16,51 +16,51 @@ namespace xin::redis {
 // 但是本作不准备用这套API了，改用一个单独的TrackingMemoryResource来实现内存跟踪
 // 这里保留原API的实现以兼容现有代码，但不再推荐使用
 struct allocator {
-    using size_type = std::size_t;
-    using error_handler = std::function<void(size_type size)>;
+    using SizeType = std::size_t;
+    using ErrorHandler = std::function<void(SizeType size)>;
 
-    static constexpr size_type PREFIX_SIZE = sizeof(size_type);
+    static constexpr SizeType PREFIX_SIZE = sizeof(SizeType);
 
-    static auto malloc(size_type size) -> void*;
+    static auto malloc(SizeType size) -> void*;
 
     template<typename T>
-    static auto malloc(size_type size) -> T*
+    static auto malloc(SizeType size) -> T*
     {
         return static_cast<T*>(malloc(size * sizeof(T)));
     }
 
-    static auto calloc(size_type size) -> void*;
+    static auto calloc(SizeType size) -> void*;
 
     template<typename T>
-    static auto calloc(size_type size) -> T*
+    static auto calloc(SizeType size) -> T*
     {
         return static_cast<T*>(calloc(size * sizeof(T)));
     }
 
-    static auto size(void* ptr) -> size_type;
+    static auto size(void* ptr) -> SizeType;
 
-    static auto realloc(void* ptr, size_type size) -> void*;
+    static auto realloc(void* ptr, SizeType size) -> void*;
 
     static auto free(void* ptr) -> void;
 
-    static auto used_memory() -> size_type;
+    static auto used_memory() -> SizeType;
 
-    static void on_error(error_handler handler);
+    static void on_error(ErrorHandler handler);
 
 private:
-    static std::atomic<size_type> used_memory_;
-    static error_handler error_handler_;
+    static std::atomic<SizeType> used_memory_;
+    static ErrorHandler error_handler_;
 
-    static void append_used_memory(size_type size);
+    static void append_used_memory(SizeType size);
 
-    static void remove_used_memory(size_type size);
+    static void remove_used_memory(SizeType size);
 };
 
 // 一个基于std::pmr::memory_resource的内存跟踪器，
 // 可以用来替代原来的allocator API，提供更现代的接口和更准确的内存使用统计
 class TrackingMemoryResource : public std::pmr::memory_resource {
 public:
-    using error_handler = std::function<void(std::size_t size)>;
+    using ErrorHandler = std::function<void(std::size_t size)>;
 
     explicit TrackingMemoryResource(
         std::pmr::memory_resource* upstream = std::pmr::get_default_resource());
@@ -71,12 +71,12 @@ public:
         return total_allocated_.load(std::memory_order_relaxed);
     }
 
-    void on_error(error_handler handler) { error_handler_ = std::move(handler); }
+    void on_error(ErrorHandler handler) { error_handler_ = std::move(handler); }
 
 private:
     std::pmr::memory_resource* upstream_;
     std::atomic<std::size_t> total_allocated_{ 0 };
-    error_handler error_handler_;
+    ErrorHandler error_handler_;
 
     auto do_allocate(std::size_t bytes, std::size_t alignment) -> void* override;
 
